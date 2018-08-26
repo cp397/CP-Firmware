@@ -11,5 +11,5 @@
 #define MEM_MOD_H_
 
 #include "l2sram.h"
-#include "l2fram.h"
+#include "L2fram.h"
 #endif /* MEM_MOD_H_ */

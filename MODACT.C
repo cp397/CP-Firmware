@@ -26,7 +26,7 @@
 #include "std.h"			//standard definitions
 #include "serial.h"			//serial IO port stuff
 #include "mem_mod.h"		// memory module
-#include "MODACT.h"			//key action change routines
+#include "modact.h"			//key action change routines
 #include "sensor.h"			//Sensor name list
 #include "pick.h"			//pick the point to send routines
 #include "key.h"			//top level keyboard routines

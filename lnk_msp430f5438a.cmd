@@ -110,7 +110,7 @@ SECTIONS
 
     .text       : {}>> FLASH | FLASH2     /* CODE                              */
     .text:_isr  : {} > FLASH              /* ISR CODE SPACE                    */
-    .cinit      : {} > FLASH              /* INITIALIZATION TABLES             */
+    .cinit      : {} > FLASH2 | FLASH     /* INITIALIZATION TABLES             */
 //#ifdef (__LARGE_DATA_MODEL__)
     .const      : {} > FLASH | FLASH2     /* CONSTANT DATA                     */
 //#else

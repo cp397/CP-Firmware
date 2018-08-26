@@ -26,7 +26,7 @@
 #include "hal/config.h"			//system configuration description file
 #include "serial.h"			//serial IO port stuff
 #include "mem_mod/mem_mod.h"			//Memory module routines
-#include "MODSTORE.h"			//key action change routines
+#include "modstore.h"			//key action change routines
 #include "key.h"			//Top Level Key commands
 #include "numcmd.h"			//numbered command handler module
 

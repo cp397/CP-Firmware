@@ -15,6 +15,7 @@
 //! @{
 
 #include <msp430x54x.h>		//processor reg description */
+#include <time_wisard.h>					//Time routines
 #include "task.h"					//Task management module
 #include "comm.h"    			//event MSG module
 #include "buz.h"					//Buzzer
@@ -22,7 +23,6 @@
 #include "mem_mod.h"			//memory module
 #include "misc.h"					//homeless functions
 #include "crc.h"					//CRC calculation module
-#include "time.h"					//Time routines
 #include "gid.h"					//group ID routines
 #include "serial.h"				//serial IO port stuff
 #include "rand.h"					//random number generator

@@ -24,7 +24,7 @@
 
 #include "std.h"			//standard defines
 #include "hal/config.h" 		//configuration values
-#include "serial.H" 		//serial port handler
+#include "serial.h" 		//serial port handler
 #include "gid.h"			//serial number handler
 #include "misc.h"			//misc utility routines
 #include "rand.h"			//random number routines

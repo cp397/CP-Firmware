@@ -6,11 +6,11 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <msp430.h>
+#include <time_wisard.h>
 #include "std.h"
 #include "usci_A0_uart.h"
 #include "SP.h"
 #include "serial.h"
-#include "time.h"
 #include "task.h"
 #include "crc.h"
 #include "scc.h"

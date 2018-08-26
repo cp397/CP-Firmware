@@ -6,9 +6,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <msp430.h>
+#include <time_wisard.h>
 #include "std.h"
 #include "usci_A0_uart.h"
-#include "time.h"
 #include "delay.h"
 
 //! \var g_ucUSCI_A0_UART_RXBuffer

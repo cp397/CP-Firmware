@@ -13,9 +13,10 @@
 #include "delay.h"
 #include "adf7020.h"
 #include <msp430.h>
-#include "SERIAL.h"
+#include <time_wisard.h>
+
+#include "serial.h"
 #include "comm.h"
-#include "time.h"
 
 extern volatile union
 {

@@ -21,6 +21,7 @@
 /*lint -e758 *//* global union not referenced */
 /*lint -e768 *//* global struct member not referenced */
 
+#include <time_wisard.h>			//system type routines
 #include "L2fram.h" 		//Level 2 FRAM handler routines
 #include "diag.h"			//diagnostic defines
 #include "std.h"			//standard defines
@@ -28,7 +29,6 @@
 #include "rom.h" 			//Rom configuration data
 #include "comm.h"			//msg routines
 #include "task.h"			//Task management routines
-#include "time.h"			//system type routines
 #include "sensor.h"			//sensor name
 #include "modopt.h" 		//role flags for wiz routines
 #include "fram.h"	//Ferro ram memory functions

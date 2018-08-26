@@ -19,17 +19,17 @@
 /*lint -e768 *//* global struct member not referenced */
 
 #include <msp430.h>		//processor register description
+#include <time_wisard.h>			//time routines
 #include "diag.h"			//diagnostic defines
 #include "std.h"			//common definitions
 #include "delay.h"  		//delay routines
 #include "serial.h" 		//serial port io pkg
-#include "time.h"			//time routines
 #include "misc.h"			//misc utility routines
 #include "bigsub.h"			//big subtract routines
 #include "button.h"			//button routines
 #include "comm.h"			//Msg routines
 #include "hal/config.h" 		//system configuration definitions
-#include "l2fram.h"			//level 2 ferro ram
+#include "L2fram.h"			//level 2 ferro ram
 uchar volatile g_ucLatencyTimerState;
 
 extern volatile ulong uslALARM_TIME;

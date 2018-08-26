@@ -22,14 +22,15 @@
 
 
 #include <msp430x54x.h>		//register and ram definition file 
+#include <pmm.h>			// Power management module
 #include "std.h"			//common definitions
-#include "misc.H"			//misc functions
+#include "misc.h"			//misc functions
+
+#include <time_wisard.h>			//system time routines
 #include "delay.h"			//delay routines
-#include "serial.H"			//serial port IO pkg
-#include "time.h"			//system time routines
+#include "serial.h"			//serial port IO pkg
 #include "button.h"			//button handler
 #include "config.h"		//system configuration definitions
-#include "PMM.h"			// Power management module
 
 /*----------------------  DEFINES  ------------------------------------------*/
 

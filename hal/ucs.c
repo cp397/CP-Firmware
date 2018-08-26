@@ -7,8 +7,8 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <msp430x54x.h>		//processor reg description */
+#include <pmm.h>
 #include "config.h"			//system configuration description file
-#include "PMM.h"
 
 
 unsigned char g_ucFrequency = 0;

@@ -25,7 +25,7 @@
 #include "../diag.h"			//runtine configuration parameters
 #include "../serial.h"			//serial port routines
 #include "l2flash.h"		//Level 2 FLASH routines
-#include "l2fram.h"			//level 2 FRAM routines
+#include "L2fram.h"			//level 2 FRAM routines
 #include "comm.h"			//msg routines
 #include "crc.h"			//crc computation routine
 #include "modopt.h"			//Modify Options routines

@@ -8,7 +8,7 @@
  *
  ******************************************************************************/
 
-#include "DIAG.h"			//Diagnostic package
+#include "diag.h"			//Diagnostic package
 /*lint -e526 *//* function not defined */
 /*lint -e657 *//* Unusual (nonportable) anonymous struct or union */
 /*lint -e714 *//* symbol not referenced */
@@ -20,12 +20,12 @@
 /*lint -e758 *//* global union not referenced */
 /*lint -e768 *//* global struct member not referenced */
 
-#include "STD.h"			//standard defines
-#include "CRC.h"			//CRC calculation module
-#include "SERIAL.h" 		//serial IO port stuff
-#include "TIME.h"			//Time routines
-#include "REPORT.h"			//report generator routines
-#include "MODOPT.h"			//Modify Options routines
+#include "std.h"			//standard defines
+#include "crc.h"			//CRC calculation module
+#include "serial.h" 		//serial IO port stuff
+#include "time_wisard.h"			//Time routines
+#include "report.h"			//report generator routines
+#include "modopt.h"			//Modify Options routines
 #include "SD_Card.h"
 #include "mem_mod.h"		// Memory module
 #include "task.h"
