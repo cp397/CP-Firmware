@@ -975,7 +975,7 @@ uchar ucOTA_WriteBlockToSP(uint uiBlockCounter)
 				if (ucReturnCode == SUCCESSCODE)
 					break;
 				else {
-					printf("SP BSL write error at address %04x\r\n", (uint) (TempMeta.fields.m_ulStartAddr + uiByteCount));
+//					printf("SP BSL write error at address %04x\r\n", (uint) (TempMeta.fields.m_ulStartAddr + uiByteCount));
 					vDELAY_LPMWait1us(1000, 0);
 				}
 				if (ucAttemptCount == 0) {

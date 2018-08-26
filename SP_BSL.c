@@ -556,7 +556,7 @@ uint8 ucSP_BSL_Erase_Multiple_Seg(uint16 uiStartAddress, uint32 ulEndAddress, ui
 		}
 		//If the erasure of a segment fails then exit the function and return the error code
 		if (ucReturnVal != SUCCESSCODE){
-			printf("Erase failed at address %08x\r\n", ulAddressCounter);
+//			printf("Erase failed at address %08x\r\n", ulAddressCounter);
 			break;
 		}
 	}
