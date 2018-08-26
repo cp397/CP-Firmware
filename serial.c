@@ -29,6 +29,7 @@
 /****************************  INCLUDES  *************************************/
 
 #include <msp430.h>		//
+#include <time_wisard.h>
 #include "std.h"
 #include "diag.h"			//diagnostic defines
 #include "config.h"			//system configuration definitions
@@ -37,7 +38,6 @@
 #include "SP.h"
 #include "led.h"
 #include "mem_mod.h"
-#include "time.h"
 
 #ifdef ESPORT_ENABLED		//defined in diag.h
 #include "ESPORT.h"		//external serial port

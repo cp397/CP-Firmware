@@ -18,7 +18,7 @@
 /*lint -e768 */		/* global struct member not referenced */
 
 #include <msp430.h>
-#include "time.h"
+#include <time_wisard.h>
 #include "delay.h"
 #include "std.h"
 

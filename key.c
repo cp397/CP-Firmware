@@ -90,6 +90,8 @@
 /*lint -e768 */		/* global struct member not referenced */
 
 
+#include <ota.h>
+#include <time_wisard.h>			//system time routines
 #include "diag.h"			//diagnostic defines
 #include "std.h"			//standard definitions
 #include "key.h"			//Top level Key commands
@@ -97,13 +99,12 @@
 #include "misc.h"			//homeless functions
 #include "crc.h"			//CRC calculation module
 #include "serial.h"			//serial IO port stuff
-#include "time.h"			//system time routines
 #include "comm.h"			//msg routines
 #include "fulldiag.h"		//runtime diag
-#include "MODACT.h"			//Keyboard action table commands
+#include "modact.h"			//Keyboard action table commands
 #include "daytime.h"		//Daytime routines
-#include "MODOPT.h"		//Rom Role Flag Handler Routines
-#include "MODSTORE.h"		//Modify Storage tables	
+#include "modopt.h"		//Rom Role Flag Handler Routines
+#include "modstore.h"		//Modify Storage tables
 #include "numcmd.h"			//numbered command routines
 #include "hal/config.h"		//system configuration description file
 #include "drivers/buz.h"			//buzzer control code
@@ -111,7 +112,6 @@
 #include "flash_mcu.h"			// Flash memory of the MCU
 #include "SP.h"							// SP board defines/routines
 #include "report.h"
-#include "OTA.h"
 #include "scc.h"
 
 #ifdef FAKE_UPLOAD_MSGS

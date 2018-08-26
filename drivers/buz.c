@@ -31,7 +31,7 @@
 #include "../delay.h"			//timer delay routine
 #include "../serial.h" 			//serial IO port stuff
 #include "buz.h"				//buzzer control code
-#include "../MODOPT.h"			//Modify Options routines
+#include "modopt.h"			//Modify Options routines
 
 
 extern volatile union						//ucDiagFlagByte1

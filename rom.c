@@ -19,7 +19,7 @@
 
 
 #include "std.h"			//standard defines
-#include "ROM.h"				//serial number handler
+#include "rom.h"				//serial number handler
 
 
 static const unsigned char ucSN_HI = 0x06;

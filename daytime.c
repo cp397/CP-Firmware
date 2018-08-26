@@ -21,11 +21,11 @@
 
 
 
+#include <time_wisard.h>			//TIME routines
 #include "diag.h"			//diagnostic defines
 #include "std.h"			//common definitions
 #include "hal/config.h" 	//system configuration definitions
 #include "serial.h" 		//serial port IO pkg
-#include "time.h"			//TIME routines
 #include "daytime.h"		//DAYTIME routines
 #include "report.h" 		//msg reporting routines
 #include "sensor.h"			//Sensor definitions

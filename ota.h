@@ -8,6 +8,9 @@
 #ifndef OTA_H_
 #define OTA_H_
 
+#include "std.h"
+#include "comm.h"
+
 //! \struct S_Metadata_fields
 //! \brief Structure used to store meta data regarding a firmware update
 //! Some information is included in both the metadata packet and each program code packet
@@ -38,7 +41,7 @@ union U_Metadata
 };
 
 
-void vOTA_ReceiveCodePacket(union DE_Code * ProgramCode);
+void vOTA_ReceiveCodePacket(union DE_Code* ProgramCode);
 void vOTA_UpdateOverSerial(void);
 void vOTA_init(void);
 void vOTA_ReprogramSP(void);

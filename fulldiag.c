@@ -23,6 +23,7 @@
 
 
 #include <msp430x54x.h>		//register and ram definition file
+#include <time_wisard.h>
 #include "std.h"			//standard defines
 #include "diag.h"			//diagnostic header
 #include "config.h" 		//configuration parameters 
@@ -30,7 +31,7 @@
 #include "main.h"			//
 #include "misc.h"			//homeless functions
 #include "fram.h"			//Ferro ram memory functions
-#include "l2fram.h"			//Level 2 FRAM routines
+#include "L2fram.h"			//Level 2 FRAM routines
 #include "fulldiag.h"		//full system diagnostic functions
 #include "l2flash.h"		//level 2 flash routines
 #include "delay.h"			//delay timer routines
@@ -47,7 +48,6 @@
 #include "gs.h" // to access report to garden server functionality
 #include "crc.h"					//CRC calculation module
 #include "report.h" // access to message writing functionality
-#include "time.h"
 #include "SD_Card_Testing.h"
 
 extern struct S_Attached_SP_Fields S_AttachedSP;

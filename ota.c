@@ -1,6 +1,8 @@
 //! \file OTA.c
 //! \brief Handles Over The Air reprogramming of MCUs
 
+#include <ota.h>
+#include <pmm.h>
 #include "comm.h"
 #include "delay.h"
 #include "misc.h"
@@ -8,16 +10,14 @@
 #include "std.h"
 #include "SD_Card.h"
 #include "task.h"
-#include "time.h"
 #include "report.h"
 #include "mem_mod.h"
 #include "crc.h"
-#include "OTA.h"
 #include "SP.h"
 #include "SP_BSL.h"
 #include "SP_UART.h"
-#include "PMM.h"
 #include <stdio.h>
+#include <time_wisard.h>
 
 #define NEGATIVE_ACK 		0
 #define ACKNOWLEDGMENT 	1
@@ -682,7 +682,7 @@ uchar ucOTA_write_programheader(union DE_Code * ProgramCode)
 //!
 //!
 
-void vOTA_ReceiveCodePacket(union DE_Code * ProgramCode)
+void vOTA_ReceiveCodePacket(union DE_Code* ProgramCode)
 {
 	uchar ucMsgIndex;
 	uint uiCRC;

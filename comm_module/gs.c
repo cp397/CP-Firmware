@@ -8,11 +8,11 @@
 //!
 /////////////////////////////////////////////////////////////////////////////
 
+#include <time_wisard.h>					//Time routines
 #include "serial.h"
 #include "comm.h"
 #include "mem_mod.h"			//memory module
 #include "crc.h"					//CRC calculation module
-#include "time.h"					//Time routines
 #include "led.h"
 #include "misc.h"
 #include "report.h"

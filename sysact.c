@@ -30,12 +30,12 @@
 #include "comm.h"			//msg handling routines
 #include "rts.h"			//Real Time Scheduler
 #include "pick.h"			//SSP table handler routines
-#include "MODOPT.h"			//Modify Options routines
-#include "LNKBLK.h"			//LnkBlk table handler routines
+#include "modopt.h"			//Modify Options routines
+#include "lnkblk.h"			//LnkBlk table handler routines
 #include "hal/config.h" 		//system configuration description file	//
-#include "mem_mod/l2sram.h"  		//disk storage module
-#include "mem_mod/l2fram.h" 		//level 2 fram routines
-#include "mem_mod/l2flash.h"		//level 2 flash routines
+#include "l2sram.h"  		//disk storage module
+#include "L2fram.h" 		//level 2 fram routines
+#include "l2flash.h"		//level 2 flash routines
 
 
 extern uchar ucGLOB_lastAwakeSlot;	//Nearest thing to cur slot

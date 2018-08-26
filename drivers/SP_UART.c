@@ -1,9 +1,9 @@
 #include <msp430.h>
+#include <time_wisard.h>
 #include "SP.h"
 #include "comm.h"
 #include "config.h"
 #include "std.h"
-#include "time.h"
 
 //! \struct S_SP_BSL
 //! \brief The structure holds the bit values and registers

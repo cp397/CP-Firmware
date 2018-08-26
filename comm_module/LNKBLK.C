@@ -29,8 +29,9 @@
 #include "task.h"
 #include "std.h"			//standard defines
 #include "serial.h" 		//serial IO port stuff
-#include "time.h"			//Time routines
-#include "LNKBLK.h"			//	Real Time Scheduler routines
+#include "lnkblk.h"			//	Real Time Scheduler routines
+
+#include <time_wisard.h>			//Time routines
 #include "comm.h"			//	radio msg helper routines
 #include "rand.h"			//	Random number generator
 #include "config.h" 	//	system configuration description file

@@ -41,10 +41,10 @@
 #include "serial.h" 		//serial IO port stuff
 #include "key.h"			//top level key command routines
 #include "numcmd.h"			//numeric command routines
-#include "MODOPT.h"			//Modify Options routines
+#include "modopt.h"			//Modify Options routines
 #include "hal/config.h" 	//system configuration description file
 #include "drivers/SP.h"
-#include "mem_mod/l2fram.h"			//Level 2 Ferro Ram routines
+#include "L2fram.h"			//Level 2 Ferro Ram routines
 
 
 /*----------------------  EXTERNS  ------------------------------------------*/

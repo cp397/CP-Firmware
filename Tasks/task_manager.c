@@ -8,6 +8,7 @@
 //!       Author: cp397
 //!
 /////////////////////////////////////////////////////////////////////////
+#include <time_wisard.h>
 #include "msp430.h"
 #include "std.h"		// standard definitions
 #include "task.h" 	// task definitions
@@ -18,7 +19,6 @@
 #include "modopt.h"
 #include "serial.h"
 #include "gs.h"				// Garden server comm
-#include "time.h"
 #include "lnkblk.h"		//Link block definitions
 #include "report.h"
 #include "misc.h"			// Miscellaneous functions

@@ -11,10 +11,10 @@
 //!
 //////////////////////////////////////////////////////////////////////////////
 
+#include <time_wisard.h>		// Time keeping module
 #include "task.h" 	// task definitions
 #include "msp430.h"	// MCU definitions
 #include "rts.h"	// Scheduler
-#include "time.h"		// Time keeping module
 #include "std.h"		// standard definitions
 #include "SP.h"			// Satellite processor driver
 #include "serial.h"		// Serial communications driver

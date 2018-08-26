@@ -18,15 +18,15 @@
 /*lint -e768 *//* global struct member not referenced */
 
 #include <MSP430.h>  //processor description
-#include "DIAG.h"			//diagnostic definitions
+#include "diag.h"			//diagnostic definitions
 #include "serial.h"	//serial comm functions
 #include "STD.H"			//standard defines
-#include "RAND.H"			//random number header
-#include "MODOPT.h"			//Modify Options routines
+#include "rand.h"			//random number header
+#include "modopt.h"			//Modify Options routines
 #include "delay.h"
 #include "buz.h" //buzzer functions
-#include "ADF7020.h" //radio driver
-#include "L2FRAM.h"			//level 2 fram routines
+#include "adf7020.h" //radio driver
+#include "L2fram.h"			//level 2 fram routines
 // RAND_NUM_SIZE may need to change!  short longs are not used.
 extern volatile unsigned char ucRAND_NUM[RAND_NUM_SIZE];
 

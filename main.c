@@ -70,7 +70,7 @@
 #include "rand.h"			//random number generator
 #include "key.h"			//keyboard handler
 #include "serial.h"		//serial port
-#include "time.h"			//System Time routines
+#include <time_wisard.h>			//System Time routines
 #include "daytime.h"	//Daytime routines
 #include "button.h" 	//Button routines
 #include "report.h"		//Reporting routines
@@ -78,8 +78,8 @@
 #include "gid.h"			//Group ID routines
 #include "sensor.h"		//sensor routines
 #include "pick.h"			//Trigger routines
-#include "MODOPT.h"		//Modify Options routines
-#include "LNKBLK.h"		//radio link handler routines
+#include "modopt.h"		//Modify Options routines
+#include "lnkblk.h"		//radio link handler routines
 #include "config.h"		//system configuration definitions
 #include "MPY32.h"
 #include "SP.h"				//SP board control
@@ -90,11 +90,11 @@
 #include "flash_mcu.h" 		// Flash memory controller for the MCU
 #include "task.h"
 #include "gs.h"				// Garden server
-#include "PMM.h"
+#include <pmm.h>
 #include "SD_Card.h"
 #include "scc.h"
 #include "sys.h"
-#include "OTA.h" 			// Over the air reprogramming
+#include <ota.h> 			// Over the air reprogramming
 
 #ifdef DEBUG_DISPATCH_TIME
 #include "t0.h"			//Timer T0 routines

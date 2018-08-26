@@ -19,6 +19,7 @@
 ///*lint -e758 */		/* global union not referenced */
 ///*lint -e768 */		/* global struct member not referenced */
 #include <msp430.h>		//processor reg description
+#include <time_wisard.h>				//Time routines
 #include "task.h"
 #include "std.h"			//standard defines
 #include "main.h"			//
@@ -27,12 +28,11 @@
 #include "rts.h"			//Real Time Scheduler routines
 #include "comm.h"			//radio msg helper routines
 #include "rand.h"			//Random number generator
-#include "time.h"				//Time routines
 #include "modopt.h" 		//role flags for wiz routines
 #include "lnkblk.h"			//Link byte handler routines
 #include "config.h" 		//system configuration description file
 #include "l2sram.h"  		//disk storage module
-#include "l2fram.h"			//Level 2 Ferro Ram routines
+#include "L2fram.h"			//Level 2 Ferro Ram routines
 #include "led.h"
 #include "buz.h"
 #include "report.h"

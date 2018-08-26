@@ -1,10 +1,10 @@
 #include <msp430x54x.h>
+#include <time_wisard.h>
 #include "SP.h"
 #include "comm.h"
 #include "config.h"
 #include "std.h"
 #include "serial.h"
-#include "time.h"
 #include "crc.h"
 #include "delay.h"
 

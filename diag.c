@@ -207,7 +207,7 @@ void vDIAG_showSramVals(
 #ifdef THIS_IS_A_DIAGNOSTIC
 #if (THIS_IS_A_DIAGNOSTIC == YES)
 
-#include "MODOPT.h"
+#include "modopt.h"
 
 /*********** vDIAG_setupRuntimeOptionBitsForDiagnostic() **********************
 *
@@ -1024,8 +1024,8 @@ void vDIAG_run_diagnostics(
 	#include "PICK.h"
 	#include "SENSOR.h"
 	#include "OPMODE.h"
-//	#include "time.h"
-	#include "L2FRAM.h"
+//	#include "time_wisard.h"
+	#include "L2fram.h"
 	#include "L2SRAM.h"
 	#include "THERMO.h"
 
@@ -2925,7 +2925,7 @@ Fred:
 
 	#ifdef KEY2_DIAG_ENA
 	{
-	#include "time.h"		//Time handling routines
+	#include "time_wisard.h"		//Time handling routines
 	#include "key.h"		//keyboard routines
 
 	/************************  KEY2 diagnostic  ******************************
@@ -3909,7 +3909,7 @@ Endless_loop:
 
 	#ifdef AMP5_DIAG_ENA
 	{
-	#include "time.h"		//Time handling routines
+	#include "time_wisard"		//Time handling routines
 	#include "misc.h"		//miscellaneous routines
 
 	/***********************  AMP5 diagnostic  *****************************
@@ -3947,7 +3947,7 @@ Endless_loop:
 
 	#ifdef AMP6_DIAG_ENA
 	{
-	#include "time.h"		//Time handling routines
+	#include "time_wisard"		//Time handling routines
 	#include "misc.h"		//miscellaneous routines
 
 	/***********************  AMP6 diagnostic  *****************************
@@ -3988,7 +3988,7 @@ Endless_loop:
 	#include "Action.h"		//Action routines
 	#include "Key.h"		//Key routines
 	#include "L2FLASH.h"	//Level 2 flash routines
-	#include "L2FRAM.h"		//Level 2 Fram routines
+	#include "L2fram.h"		//Level 2 Fram routines
 
 	/***********************  BATT1 diagnostic  *******************************
 	*
@@ -7443,10 +7443,10 @@ st:		BTFSC	PORTB,2,0		//lint !e40 !e522 !e10
 
 	#ifdef LNKBLK1_DIAG_ENA
 
-	#include "LNKBLK.h"
+	#include "lnkblk.h"
 	#include "L2SRAM.h"
 	#include "SRAM.h"
-	#include "TIME.h"
+	#include "time_wisard.h"
 
 
 	/*******************  LNKBLK1 diagnostic  ******************************
@@ -7599,10 +7599,10 @@ Hang:
 
 	#ifdef LNKBLK2_DIAG_ENA
 
-	#include "LNKBLK.h"
+	#include "lnkblk.h"
 	#include "L2SRAM.h"
 //	#include "SRAM.h"
-//	#include "TIME.h"
+//	#include "time_wisard.h"
 
 
 	/*******************  LNKBLK2 diagnostic  ******************************
@@ -7656,10 +7656,10 @@ Hang:
 
 	#ifdef LNKBLK3_DIAG_ENA
 
-	#include "LNKBLK.h"
+	#include "lnkblk.h"
 //	#include "L2SRAM.h"
 //	#include "SRAM.h"
-//	#include "TIME.h"
+//	#include "time_wisard.h"
 
 	/*******************  LNKBLK3 diagnostic  ******************************
 	*
@@ -7691,10 +7691,10 @@ Hang:
 
 	#ifdef LNKBLK4_DIAG_ENA
 
-	#include "LNKBLK.h"
+	#include "lnkblk.h"
 //	#include "L2SRAM.h"
 //	#include "SRAM.h"
-//	#include "TIME.h"
+//	#include "time_wisard.h"
 
 	/*******************  LNKBLK4 diagnostic  ******************************
 	*
@@ -7946,8 +7946,8 @@ Exit_this:
 	{
 //	#include "l2sram.h"
 	#include "opmode.h"
-	#include "l2fram.h"
-	#include "time.h"
+	#include "L2fram.h"
+	#include "time_wisard.h"
 	#include "sensor.h"
 	#include "misc.h"
 	#include "delay.h"
@@ -8011,8 +8011,8 @@ Exit_this:
 	#ifdef MSG3_DIAG_ENA
 	{
 	#include "opmode.h" 	//Operational mode routines
-	#include "l2fram.h"		//Level 2 Ferro RAM
-	#include "time.h"		//Time handling routines
+	#include "L2fram.h"		//Level 2 Ferro RAM
+	#include "time_wisard.h"		//Time handling routines
 	#include "sensor.h"		//sensor definitions
 	#include "report.h"		//internal reporting functions
 
@@ -8184,8 +8184,8 @@ Exit_this:
 	#ifdef NUMCMD1_DIAG_ENA
 
 	#include "opmode.h" 	//Operational mode routines
-	#include "l2fram.h"		//Level 2 Ferro RAM
-	#include "time.h"		//Time handling routines
+	#include "L2fram.h"		//Level 2 Ferro RAM
+	#include "time_wisard.h"		//Time handling routines
 	#include "sensor.h"		//sensor definitions
 	#include "report.h"		//internal reporting functions
 	#include "numcmd.h"		//numeric command routines
@@ -10734,7 +10734,7 @@ Do_Reply:
 
 	#ifdef ROLE1_DIAG_ENA
 
-	#include "MODOPT.h"
+	#include "modopt.h"
 
 	/********  TEST ROLE ROUTINES ********
 	*
@@ -11570,8 +11570,8 @@ Do_Reply:
 		#include "l2flash.h"
 		#include "opmode.h"
 		#include "msg.h"
-		#include "l2fram.h"
-		#include "time.h"
+		#include "L2fram.h"
+		#include "time_wisard.h"
 		#include "sensor.h"
 		#include "misc.h"
 		#include "delay.h"
@@ -11626,8 +11626,8 @@ Do_Reply:
 		#include "l2sram.h"
 		#include "opmode.h"
 		#include "msg.h"
-		#include "l2fram.h"
-		#include "time.h"
+		#include "L2fram.h"
+		#include "time_wisard.h"
 		#include "sensor.h"
 		#include "misc.h"
 		#include "delay.h"

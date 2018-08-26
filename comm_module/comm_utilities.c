@@ -27,13 +27,13 @@
 /*lint -e768 *//* global struct member not referenced */
 
 #include <msp430x54x.h>		//processor reg description */
+#include <time_wisard.h>			//Time routines
 #include "../diag.h"			//Diagnostic package
 #include "std.h"			//standard defines
 #include "misc.h"			//homeless functions
 #include "crc.h"			//CRC calculation module
 #include "serial.h"			//serial IO port stuff
 #include "comm.h"    		//event MSG module
-#include "time.h"			//Time routines
 #include "gid.h"			//group ID routines
 #include "rand.h"			//random number generator
 #include "sensor.h"			//sensor name routines
@@ -42,7 +42,7 @@
 #include "config.h" 	//system configuration description file
 #include "buz.h"
 #include "adf7020.h"//radio driver
-#include "l2fram.h" 		//Level 2 Fram routines
+#include "L2fram.h" 		//Level 2 Fram routines
 #include "l2sram.h"  		//disk storage module
 #include "main.h"
 #include "report.h"
