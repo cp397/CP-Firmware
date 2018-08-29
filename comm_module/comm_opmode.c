@@ -1130,7 +1130,7 @@ uchar ucComm_WaitFor_RTR(void)
 			ucTask_SetField(ucTask_FetchTaskIndex(TASK_ID_RTJ), TSK_STATE, TASK_STATE_ACTIVE);
 
 			// Set discovery to partial
-			vCommSetDiscMode(PARTIALDISCOVERY);
+			vComm_SetDiscMode(PARTIALDISCOVERY);
 
 			ucLinkFailReason = SRC_ID_LINK_BROKEN; //wups this is the big fail
 			ucLinkFailPriority = RPT_PRTY_LINK_BROKEN;

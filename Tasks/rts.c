@@ -861,19 +861,19 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 	ucNST_tblNum = ucRTS_computeNSTfromFrameNum(lFrameNumToSched);
 
 	// Get the current discovery settings
-	vCommGetDiscMode(&S_Disc);
+	vComm_GetDiscMode(&S_Disc);
 
 	// If for some reason the discovery structure has been corrupted then go to full discovery
 	if(S_Disc.m_ucMode != FULLDISCOVERY && S_Disc.m_ucMode != PARTIALDISCOVERY && S_Disc.m_ucMode != BURSTDISCOVERY){
-		vCommSetDiscMode(FULLDISCOVERY);
-		vCommGetDiscMode(&S_Disc);
+		vComm_SetDiscMode(FULLDISCOVERY);
+		vComm_GetDiscMode(&S_Disc);
 	}
 
 	// Cycle through the discovery modes as needed
 	if (ucFLAG0_BYTE.FLAG0_STRUCT.FLG0_HAVE_WIZ_GROUP_TIME_BIT == 0) {
 		// Go to full discovery if we don't have network time and refresh structure
-		vCommSetDiscMode(FULLDISCOVERY);
-		vCommGetDiscMode(&S_Disc);
+		vComm_SetDiscMode(FULLDISCOVERY);
+		vComm_GetDiscMode(&S_Disc);
 	}
 	else if (S_Disc.m_ucMode == PARTIALDISCOVERY) {
 		if (((ulong)lTIME_getSysTimeAsLong() - S_Disc.m_ulStartTime) >= S_Disc.m_ulMaxDuration){
@@ -882,15 +882,15 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 			vRTS_CreateRadioDiagTask();
 
 			// Set discovery to burst and refresh structure
-			vCommSetDiscMode(BURSTDISCOVERY);
-			vCommGetDiscMode(&S_Disc);
+			vComm_SetDiscMode(BURSTDISCOVERY);
+			vComm_GetDiscMode(&S_Disc);
 		}
 	}
 	else if (S_Disc.m_ucMode == BURSTDISCOVERY) {
 		if (((ulong) lTIME_getSysTimeAsLong() - S_Disc.m_ulStartTime) >= S_Disc.m_ulMaxDuration) {
 			// Set discovery to full and refresh the structure
-			vCommSetDiscMode(FULLDISCOVERY);
-			vCommGetDiscMode(&S_Disc);
+			vComm_SetDiscMode(FULLDISCOVERY);
+			vComm_GetDiscMode(&S_Disc);
 		}
 	}
 
@@ -946,7 +946,7 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 
 		default:
 			// Added for redundancy. Must ensure that the discovery module is in a valid state
-			vCommSetDiscMode(FULLDISCOVERY);
+			vComm_SetDiscMode(FULLDISCOVERY);
 			break;
 	}
 

@@ -60,6 +60,7 @@
 /*lint -e758 *//* global union not referenced */
 /*lint -e768 *//* global struct member not referenced */
 
+#include <stdint.h>
 #include <msp430.h>		//register and ram definition file
 #include "std.h"			//std defines
 #include "diag.h"			//Diagnostic package header
@@ -116,7 +117,6 @@
 
 /**********************  VOLATILE  GLOBALS  **********************************/
 
-volatile uchar ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
 volatile ADF7020_Driver_t ADF7020_Driver;
 
 //Time keeping variables
@@ -976,6 +976,7 @@ void vMAIN_computeDispatchTiming(void)
 	long lThisLinearSlot;
 	uchar ucMsgIndex;
 	long lThisFrameNum;
+	uint8_t ucDEBuf[MAX_DE_LEN];
 
 	/* CHECK IF WE HAVE HAD A TIME RESET */
 	if (ucFLAG0_BYTE.FLAG0_STRUCT.FLG0_RESET_ALL_TIME_BIT)
@@ -984,11 +985,11 @@ void vMAIN_computeDispatchTiming(void)
 		if (lTIME_getClk2AsLong() != lTIME_getSysTimeAsLong())
 		{
 			// Build the report data element header
-			vComm_DE_BuildReportHdr(CP_ID, 6, ucMAIN_GetVersion());
+			vComm_DE_BuildReportHdr(ucDEBuf, CP_ID, 6, ucMAIN_GetVersion());
 			ucMsgIndex = DE_IDX_RPT_PAYLOAD;
-			ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_SET_TIME;
-			ucaMSG_BUFF[ucMsgIndex++] = 4; // data length
-			vMISC_copyUlongIntoBytes( lTIME_getSysTimeAsLong(), (uchar*)&ucaMSG_BUFF[ucMsgIndex], NO_NOINT);
+			ucDEBuf[ucMsgIndex++] = SRC_ID_SET_TIME;
+			ucDEBuf[ucMsgIndex++] = 4; // data length
+			vMISC_copyUlongIntoBytes( lTIME_getSysTimeAsLong(), (uchar*)&ucDEBuf[ucMsgIndex], NO_NOINT);
 			// Store DE
 			vReport_LogDataElement(RPT_PRTY_SET_TIME);
 		}

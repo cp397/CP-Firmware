@@ -26,6 +26,7 @@
 /*lint -e758 *//* global union not referenced */
 /*lint -e768 *//* global struct member not referenced */
 
+#include <stdint.h>
 #include <msp430x54x.h>		//processor reg description */
 #include <time_wisard.h>			//Time routines
 #include "../diag.h"			//Diagnostic package
@@ -46,6 +47,7 @@
 #include "l2sram.h"  		//disk storage module
 #include "main.h"
 #include "report.h"
+#include "contracts.h"
 
 //! \var union DE_Command UCommandDE
 //! \brief This union contains the fields required for a command data element
@@ -130,7 +132,7 @@ uchar ucFreqAdjustIndex;
 //! \brief Indicates that we have synchronized frequencies
 uchar g_ucFreqLocked;
 
-T_Text S_MsgName[MSG_TYPE_MAX_COUNT] =
+static const T_Text S_MsgName[MSG_TYPE_MAX_COUNT] =
 {
 		{"NONE", 4}, 	//0 reserved
 		{"BCN", 3},		//1 beacon message
@@ -204,7 +206,7 @@ void vComm_Msg_buildOperational(uchar ucFlags, uint uiMsgNum, uint uiDest, uchar
 //! \param ucProcID, ucSrcID, ucLength, p_ucData,
 //! \return The next free location in the message buffer
 ///////////////////////////////////////////////////////////////////////////////
-void vComm_DE_BuildReportHdr(uchar ucProcID, uchar ucPayloadLen, uchar ucVersion)
+void vComm_DE_BuildReportHdr(uint8_t* ucBuf, uchar ucProcID, uchar ucPayloadLen, uchar ucVersion)
 {
 	long lTime;
 
@@ -212,19 +214,19 @@ void vComm_DE_BuildReportHdr(uchar ucProcID, uchar ucPayloadLen, uchar ucVersion
 	lTime = lTIME_getSysTimeAsLong();
 
 	//stuff the received fields into the data element structure
-	ucaMSG_BUFF[DE_IDX_ID] = REPORT_DATA;
-	ucaMSG_BUFF[DE_IDX_LENGTH] = ucPayloadLen + 8;
-	ucaMSG_BUFF[DE_IDX_VERSION] = ucVersion;
-	ucaMSG_BUFF[DE_IDX_RPT_PROCID] = ucProcID;
+	ucBuf[DE_IDX_ID] = REPORT_DATA;
+	ucBuf[DE_IDX_LENGTH] = ucPayloadLen + 8;
+	ucBuf[DE_IDX_VERSION] = ucVersion;
+	ucBuf[DE_IDX_RPT_PROCID] = ucProcID;
 
 	// Pack the time into the buffer
-	ucaMSG_BUFF[DE_IDX_TIME_SEC_LO] = (uchar) lTime;
+	ucBuf[DE_IDX_TIME_SEC_LO] = (uchar) lTime;
 	lTime = lTime >> 8;
-	ucaMSG_BUFF[DE_IDX_TIME_SEC_MD] = (uchar) lTime;
+	ucBuf[DE_IDX_TIME_SEC_MD] = (uchar) lTime;
 	lTime = lTime >> 8;
-	ucaMSG_BUFF[DE_IDX_TIME_SEC_HI] = (uchar) lTime;
+	ucBuf[DE_IDX_TIME_SEC_HI] = (uchar) lTime;
 	lTime = lTime >> 8;
-	ucaMSG_BUFF[DE_IDX_TIME_SEC_XI] = (uchar) lTime;
+	ucBuf[DE_IDX_TIME_SEC_XI] = (uchar) lTime;
 
 }
 
@@ -239,7 +241,7 @@ void vComm_DE_BuildReportHdr(uchar ucProcID, uchar ucPayloadLen, uchar ucVersion
 //! 5. Src SN
 //!
 //!
-//! \param ucChkByteBits
+//! \param ucChkBits
 //!	<ul>
 //!   <li>BIT7 Check CRC
 //!   <li>BIT6 Check MSG ID
@@ -251,7 +253,7 @@ void vComm_DE_BuildReportHdr(uchar ucProcID, uchar ucPayloadLen, uchar ucVersion
 //!	  <li>BIT0 unused
 //!	</ul>
 //!
-//! \param ucReportByteBits
+//! \param ucReportBits
 //! <ul>
 //!   <li>BIT7 Report CRC error
 //!   <li>BIT6 Report MSG ID error
@@ -275,31 +277,30 @@ void vComm_DE_BuildReportHdr(uchar ucProcID, uchar ucPayloadLen, uchar ucVersion
 //!	  <li>BIT0 unused
 //!	</ul>
 ///////////////////////////////////////////////////////////////////////////////
-uchar ucComm_chkMsgIntegrity(
-//RET: BitMask if BAD,  0 if OK
-    uchar ucChkByteBits, uchar ucReportByteBits, uchar ucMsgType, uint uiExpectedSrcSN, uint uiExpectedDestSN)
+uint8_t ucComm_chkMsgIntegrity(uint8_t* ucMsgBuf, uint8_t ucChkBits, uint8_t ucReportBits, uint8_t ucMsgType, uint16_t uiExpectedSrcSN, uint16_t uiExpectedDestSN)
 {
-	uchar ucErrRetVal;
-	uint uiMsgDestSN;
-	uint uiMsgSrcSN;
-	uchar ucPacketLength;
+	uint8_t ucErrRetVal= 0; //assume no errors;
+	uint16_t uiMsgDestSN;
+	uint16_t uiMsgSrcSN;
+	uint8_t ucPacketLength;
 
-	ucErrRetVal = 0; //assume no errors
+	REQUIRE(ucMsgBuf);
+	REQUIRE(ucMsgType < MSG_TYPE_MAX_COUNT);
 
 	// Set the length of the packet
-	ucPacketLength = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+	ucPacketLength = ucMsgBuf[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
 
 	/* CHECK THE CRC -- IF ITS BAD -- LOOP BACK */
-	if ((ucChkByteBits & CHKBIT_CRC) && (!ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_REC, ucaMSG_BUFF, ucPacketLength))) {
-		if (ucReportByteBits & CHKBIT_CRC) {
+	if ((ucChkBits & CHKBIT_CRC) && (!ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_REC, ucaMSG_BUFF, ucPacketLength))) {
+		if (ucReportBits & CHKBIT_CRC) {
 			vSERIAL_sout("MSG:BdCRC\r\n", 11);
 		}
 		ucErrRetVal |= CHKBIT_CRC;
 	}
 
 	/* CHECK FOR PROPER MSG TYPE */
-	if ((ucChkByteBits & CHKBIT_MSG_TYPE) && (ucaMSG_BUFF[MSG_IDX_ID] != ucMsgType)) {
-		if (ucReportByteBits & CHKBIT_MSG_TYPE) {
+	if ((ucChkBits & CHKBIT_MSG_TYPE) && (ucaMSG_BUFF[MSG_IDX_ID] != ucMsgType)) {
+		if (ucReportBits & CHKBIT_MSG_TYPE) {
 			uchar ucGotMsgType;
 			ucGotMsgType = ucaMSG_BUFF[MSG_IDX_ID];
 
@@ -320,24 +321,24 @@ uchar ucComm_chkMsgIntegrity(
 	}
 
 	/* CHECK FOR A GROUP SELECTOR MATCH */
-	if ((ucChkByteBits & CHKBIT_GRP_SEL)
-			&& (!ucGID_compareOnlySysGrpSelectToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_GID_HI], ucReportByteBits & CHKBIT_GRP_SEL, //report flag
+	if ((ucChkBits & CHKBIT_GRP_SEL)
+			&& (!ucGID_compareOnlySysGrpSelectToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_GID_HI], ucReportBits & CHKBIT_GRP_SEL, //report flag
 					YES_CRLF))) {
 		ucErrRetVal |= CHKBIT_GRP_SEL;
 	}
 
 	/* CHECK FOR GROUP ID */
-	if ((ucChkByteBits & CHKBIT_GID) && (ucGID_getSysGrpSelectAsByte() == 0)) {
-		if (!ucGID_compareOnlySysGidToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_GID_HI], ucReportByteBits & CHKBIT_GID, YES_CRLF)) {
+	if ((ucChkBits & CHKBIT_GID) && (ucGID_getSysGrpSelectAsByte() == 0)) {
+		if (!ucGID_compareOnlySysGidToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_GID_HI], ucReportBits & CHKBIT_GID, YES_CRLF)) {
 			ucErrRetVal |= CHKBIT_GID;
 		}
 	}
 
 	/* CHECK DEST ID */
-	if (ucChkByteBits & CHKBIT_DEST_SN) {
+	if (ucChkBits & CHKBIT_DEST_SN) {
 		uiMsgDestSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[NET_IDX_DEST_HI], NO_NOINT);
 		if (uiMsgDestSN != uiExpectedDestSN) {
-			if (ucReportByteBits & CHKBIT_DEST_SN) {
+			if (ucReportBits & CHKBIT_DEST_SN) {
 				vSERIAL_sout("MSG:BdDstSN ", 12);
 				vComm_showSNmismatch(uiExpectedDestSN, uiMsgDestSN, YES_CRLF);
 			}
@@ -347,10 +348,10 @@ uchar ucComm_chkMsgIntegrity(
 	}/* END: if() */
 
 	/* CHECK THE SOURCE SN */
-	if (ucChkByteBits & CHKBIT_SRC_SN) {
+	if (ucChkBits & CHKBIT_SRC_SN) {
 		uiMsgSrcSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[NET_IDX_SRC_HI], NO_NOINT);
 		if (uiMsgSrcSN != uiExpectedSrcSN) {
-			if (ucReportByteBits & CHKBIT_SRC_SN) {
+			if (ucReportBits & CHKBIT_SRC_SN) {
 				vSERIAL_sout("MSG:BDSrcSN ", 12);
 				vComm_showSNmismatch(uiExpectedSrcSN, uiMsgSrcSN, YES_CRLF);
 			}
@@ -627,7 +628,7 @@ void vMSG_showStorageErr(char *cpLeadinMsg, uint uiStrLength, unsigned long ulFa
  *		0 = Timed out
  *
  ******************************************************************************/
-uchar ucComm_waitForMsgOrTimeout(unsigned char ucReadRSSI)
+uint8_t ucComm_waitForMsgOrTimeout(uint8_t* ucMsgBuf, uint16_t ucMsgLen, bool bReadRSSI)
 {
 	uchar ucRetVal;
 
@@ -658,7 +659,7 @@ uchar ucComm_waitForMsgOrTimeout(unsigned char ucReadRSSI)
 		}
 
 		// If we are receiving a message and the RSSI task is active then sample RSSI
-		if (unADF7020_GetRadioState() == RX_ACTIVE && ucReadRSSI == YES_RSSI) {
+		if (unADF7020_GetRadioState() == RX_ACTIVE && bReadRSSI) {
 			ucADF7020_SampleRSSI();
 		} // END: if()
 

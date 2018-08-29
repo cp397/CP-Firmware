@@ -56,7 +56,6 @@
 #define SEGMENT_LENGTH_LONG					128L
 
 
-extern volatile uchar ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
 extern unsigned long ulGLOB_msgSysLFactor; //global load factor
 
 //! \var g_lHourlyTime
@@ -112,11 +111,11 @@ uint uiReport_RAM_QueueCount(void)
 //! \param none
 //! \return none
 ////////////////////////////////////////////////////////////////////////////////
-void vReport_LogDataElement(uchar ucPriority)
+void vReport_LogDataElement(uint8_t* ucBuf, uint8_t ucPriority)
 {
-	uchar ucIndex;
-	uchar ucDE_Length;
-	uchar ucReportingPriority;
+    uint8_t ucIndex;
+    uint8_t ucDE_Length;
+    uint8_t ucReportingPriority;
 
 	// Get the reporting priority of the system
 	ucReportingPriority = ucL2FRAM_GetReportingPriority();
@@ -132,7 +131,7 @@ void vReport_LogDataElement(uchar ucPriority)
 		S_RAM_Queue.m_ucaQueue[S_RAM_Queue.m_uiQueueTail + ucIndex] = 0x00;
 
 	// the length of the DE is the second byte in the buffer
-	ucDE_Length = ucaMSG_BUFF[SP_MSG_LEN_IDX];
+	ucDE_Length = ucBuf[SP_MSG_LEN_IDX];
 
 	// Range check the length of the data element
 	if (ucDE_Length > MAX_DE_LEN)
@@ -141,7 +140,7 @@ void vReport_LogDataElement(uchar ucPriority)
 	// Loop through the message buffer and write contents to the RAM queue
 	for (ucIndex = 0; ucIndex < ucDE_Length; ucIndex++)
 	{
-		S_RAM_Queue.m_ucaQueue[S_RAM_Queue.m_uiQueueTail + ucIndex] = ucaMSG_BUFF[ucIndex];
+		S_RAM_Queue.m_ucaQueue[S_RAM_Queue.m_uiQueueTail + ucIndex] = ucBuf[ucIndex];
 	}
 
 	// Increment the tail to point to the next free location
@@ -537,7 +536,7 @@ uchar ucReport_CrisisLog(void)
 	}
 
 	// the length of the DE is the second byte in the buffer
-	ucDE_Length = ucaMSG_BUFF[SP_MSG_LEN_IDX];
+	ucDE_Length = ucBuf[SP_MSG_LEN_IDX];
 
 	// Range check the length of the data element
 	if (ucDE_Length > MAX_DE_LEN)

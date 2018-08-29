@@ -11,6 +11,8 @@
 #ifndef COMM_H_INCLUDED
 #define COMM_H_INCLUDED
 
+#include <stdint.h>
+#include <stdbool.h>
 #include "task.h"
 
 //! @name Data Element definitions
@@ -514,24 +516,23 @@ union SP_LabelMessage
 /********  MESSAGE TYPES  ***********/
 
 
-#define MSG_ID_BEACON						1
+#define MSG_ID_BEACON           1
 #define MSG_ID_REQUEST_TO_JOIN	2
-#define MSG_ID_OPERATIONAL			3
-#define MSG_ID_RTR							4
-#define MSG_ID_LRQ							5
-#define MSG_ID_RTS							6
+#define MSG_ID_OPERATIONAL      3
+#define MSG_ID_RTR              4
+#define MSG_ID_LRQ              5
+#define MSG_ID_RTS              6
+#define MSG_TYPE_MAX_COUNT      7
 
-#define MSG_TYPE_MAX_COUNT	 7
-
-#define FULLDISCOVERY						0
-#define PARTIALDISCOVERY				1
-#define BURSTDISCOVERY					2
-#define MAXDISCOVERYMODES				3
+#define FULLDISCOVERY       0
+#define PARTIALDISCOVERY    1
+#define BURSTDISCOVERY      2
+#define MAXDISCOVERYMODES   3
 
 //! \def CRC_SZ
 //! \brief Size of the CRC bytes.
 //! I add this to make the code more readable
-#define CRC_SZ									2
+#define CRC_SZ      2
 
 //! \defgroup Network Layer Message Indices
 //! @{
@@ -764,13 +765,6 @@ union SP_LabelMessage
 
 //! @}
 
-//! \def YES_RSSI
-//! \brief Used to tell radio to sample RSSI
-#define YES_RSSI		1
-//! \def NO_RSSI
-//! \brief Used to tell radio not to sample RSSI
-#define NO_RSSI			0
-
 /* OPERATIONAL MODE DEFINES */
 
 ///* OM2 INDEXES */
@@ -781,10 +775,10 @@ union SP_LabelMessage
 #define BROKEN_LINK_MAX_COUNT		3
 
 
-void vComm_DE_BuildReportHdr(uchar ucProcID,  uchar ucPayloadLen, uchar ucVersion);
+void vComm_DE_BuildReportHdr(uint8_t* ucBuf, uchar ucProcID, uchar ucPayloadLen, uchar ucVersion);
 void vComm_NetPkg_buildHdr(uint uiDest);
 
-uchar ucComm_chkMsgIntegrity(uchar ucCheckByteBits, uchar ucReportByteBits, uchar ucMsgType, uint uiExpectedSrcSN, uint uiExpectedDestSN);
+uint8_t ucComm_chkMsgIntegrity(uint8_t* ucMsgBuf, uint8_t ucChkBits, uint8_t ucReportBits, uint8_t ucMsgType, uint16_t uiExpectedSrcSN, uint16_t uiExpectedDestSN);
 
 void vComm_showSNmismatch(uint uiExpectedVal, uint uiGotVal, uchar ucCRLF_flag //YES_CRLF, NO_CRLF
     );
@@ -805,8 +799,8 @@ void vComm_SynchFreq(signed char cClockAdjust);
 void vComm_showSOMandROMcounts(uchar ucCRLF_termFlag);
 void vCommTest(void);
 
-void vCommSetDiscMode(uint8 ucMode);
-void vCommGetDiscMode(T_Discovery *S_Disc);
+void vComm_SetDiscMode(uint8 ucMode);
+void vComm_GetDiscMode(T_Discovery *S_Disc);
 
 /* ROUTINE DEFINITIONS */
 uchar ucMSG_chkMsgIntegrity(uchar ucCheckByteBits, uchar ucReportByteBits, uchar ucMsgType, uint uiExpectedSrcSN, uint uiExpectedDestSN);
@@ -818,7 +812,7 @@ void vMSG_showStorageErr(char *cpLeadinMsg, uint uiStrLength, unsigned long ulFa
 void vMSG_buildMsgHdr_GENERIC( //HDR=Len,Type,Group,Src,Dest
     uchar ucMsgLen, uchar ucMsgType, uint uiDestSN, uchar ucFlags);
 
-uchar ucComm_waitForMsgOrTimeout(unsigned char ucReadRSSI);
+uint8_t ucComm_waitForMsgOrTimeout(uint8_t* ucMsgBuf, uint16_t ucMsgLen, bool bReadRSSI);
 void vMSG_rec_obnd_msgs(void);
 void vMSG_showMsgBuffer(uchar ucCRLF_termFlag, //YES_CRLF, NO_CRLF
     uchar ucShowTypeFlag //SHOW_MSG_RAW, SHOW_MSG_COOKED

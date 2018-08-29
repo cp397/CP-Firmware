@@ -9,8 +9,8 @@
 //!
 /////////////////////////////////////////////////////////////////////////////
 
+#include <stdint.h>
 #include <msp430x54x.h>		//processor reg description */
-
 #include "../time_wisard.h"					//Time routines
 #include "comm.h"    			//event MSG module
 #include "buz.h"					//Buzzer
@@ -27,6 +27,7 @@
 #include "report.h"				//Logging module
 #include "main.h"					// For getting software version
 #include "lnkblk.h"				// Link information
+#include "contracts.h"
 
 /////////////////// defines //////////////////////
 #define MAX_LINKS_PER_SLOT		3
@@ -34,7 +35,6 @@
 
 
 ///////////////////   externs    /////////////////////////
-extern volatile uint8 ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
 extern uchar ucGLOB_myLevel; //senders level +1
 extern uint uiGLOB_TotalRTJ_attempts; //counts number of Request to Join attempts
 
@@ -97,42 +97,19 @@ extern volatile union
 static const uint ucaLinkSlotTimes[MAX_LINKS_PER_SLOT] =
 { 0x0000, 0x0400, 0x0800 };
 
-uint uiaLinkSN[MAX_LINKS_PER_SLOT];
-uchar ucLinkSNidx;
+static uint16_t uiaLinkSN[MAX_LINKS_PER_SLOT];
+static uint8_t  ucLinkSNidx;
 
 // Structure containing discovery modes and settings (Initial state is invalid)
-T_Discovery S_Discovery = {0xFF, 0, 0};
+static T_Discovery S_Discovery = {0xFF, 0, 0};
 
 //! \var ulaDiscDuration
 //! \brief Durations(in seconds) allowed in each discovery mode
-const ulong ulaDiscDuration[MAXDISCOVERYMODES] = {0, 60, 14400};
+static const ulong ulaDiscDuration[MAXDISCOVERYMODES] = {0, 60, 14400};
 
 /************************** Code starts here *********************************/
 
-///////////////////////////////////////////////////////////////////////////////
-//! \fn vSetDiscMode
-//! \brief Sets the discovery mode
-//!	\param ucMode, the desired mode
-///////////////////////////////////////////////////////////////////////////////
-void vCommSetDiscMode(uint8 ucMode)
-{
-	S_Discovery.m_ucMode = ucMode;
-	S_Discovery.m_ulStartTime = lTIME_getSysTimeAsLong();
-	S_Discovery.m_ulMaxDuration = ulaDiscDuration[ucMode];
-}
 
-
-///////////////////////////////////////////////////////////////////////////////
-//! \fn vGetDiscMode
-//! \brief Gets the current discovery settings
-//! \param *S_Disc
-///////////////////////////////////////////////////////////////////////////////
-void vCommGetDiscMode(T_Discovery *S_Disc)
-{
-	S_Disc->m_ucMode = S_Discovery.m_ucMode;
-	S_Disc->m_ulStartTime = S_Discovery.m_ulStartTime;
-	S_Disc->m_ulMaxDuration = S_Discovery.m_ulMaxDuration;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 //! \brief Builds the request to join message
@@ -144,32 +121,27 @@ void vCommGetDiscMode(T_Discovery *S_Disc)
 //! \param ulRandomSeed
 //! \return none
 ///////////////////////////////////////////////////////////////////////////////
-void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
+static void vBuildRequestToJoin(uint8_t* ucMsgBuf, uint32_t ulRandomSeed)
 {
-	uchar ucEdgeCount;
-	uchar ucMsgIndex;
-	uchar ucPacketSize;
+    uint8_t ucMsgIndex;
+	uint8_t ucEdgeCount;
+	uint8_t ucPacketSize;
 
-	// Start the index at 0;
-	ucMsgIndex = 0;
+	REQUIRE(ucMsgBuf);
 
-	/* STUFF MSG TYPE */
-	ucaMSG_BUFF[MSG_IDX_ID] = MSG_ID_REQUEST_TO_JOIN;
-
-	// Stuff the message flags
-	ucaMSG_BUFF[MSG_IDX_FLG] = 0x20;
-
-	// Stuff the message number
-	ucaMSG_BUFF[MSG_IDX_NUM_HI] = 0x00;
-	ucaMSG_BUFF[MSG_IDX_NUM_LO] = 0x00;
+    // Stuff the message type, flags, number,
+	ucMsgBuf[MSG_IDX_ID]     = MSG_ID_REQUEST_TO_JOIN;
+	ucMsgBuf[MSG_IDX_FLG]    = 0x20;
+	ucMsgBuf[MSG_IDX_NUM_HI] = 0x00;
+	ucMsgBuf[MSG_IDX_NUM_LO] = 0x00;
 
 	//Stuff the source address
-	vL2FRAM_copySnumLo16ToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI]);
+	vL2FRAM_copySnumLo16ToBytes(&ucMsgBuf[MSG_IDX_ADDR_HI]);
 
 	// Stuff the random seed to schedule future communication
-	vMISC_copyUlongIntoBytes(ulRandomSeed, (uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
+	vMISC_copyUlongIntoBytes(ulRandomSeed, &ucMsgBuf[MSG_IDX_RANDSEED_XI], NO_NOINT);
 
-	ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = uiNumEdges;
+	ucMsgBuf[MSG_IDX_NUM_EDGES] = uiNumEdges;
 
 	ucMsgIndex = MSG_IDX_EDGE_DISC;
 
@@ -178,35 +150,23 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
 		// load the routing table
 		for (ucEdgeCount = 0; ucEdgeCount < uiNumEdges; ucEdgeCount++)
 		{
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiSrc >> 8);
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiSrc;
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiDest >> 8);
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiDest;
+		    ucMsgBuf[ucMsgIndex++] = (uint8_t) (S_edgeList[ucEdgeCount].m_uiSrc >> 8);
+		    ucMsgBuf[ucMsgIndex++] = (uint8_t) S_edgeList[ucEdgeCount].m_uiSrc;
+		    ucMsgBuf[ucMsgIndex++] = (uint8_t) (S_edgeList[ucEdgeCount].m_uiDest >> 8);
+		    ucMsgBuf[ucMsgIndex++] = (uint8_t) S_edgeList[ucEdgeCount].m_uiDest;
 		}
 
 		// stuff message size
-		ucaMSG_BUFF[MSG_IDX_LEN] = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
+		ucMsgBuf[MSG_IDX_LEN] = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * sizeof(S_Edge));
 	}
 
-	// Set the packet size
-	 ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+	// Get packet len and compute CRC
+	ucPacketSize = ucMsgBuf[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+	ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucMsgBuf, ucPacketSize);
 
-	/* COMPUTE THE CRC */
-	ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucaMSG_BUFF, ucPacketSize) ; //lint !e534 //compute the CRC
+} //END: vBuildRequest_to_Join()
 
-	//Show the message
-#if 0
-	uint8 ucCounter;
 
-	vSERIAL_rom_sout("RTJ:\r\n", 6);
-	for (ucCounter = 0; ucCounter < ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ; ucCounter++)
-	{
-		vSERIAL_HB8out(ucaMSG_BUFF[ucCounter]);
-		vSERIAL_crlf();
-	}
-#endif
-
-} //END: vComm_Msg_buildRequest_to_Join()
 
 ///////////////////////////////////////////////////////////////////////////////
 //! \brief Builds the beacon message
@@ -217,62 +177,45 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
 //! hub (sourceIDlevel)
 //!
 ///////////////////////////////////////////////////////////////////////////////
-static void vComm_Msg_buildBeacon(long lSyncTimeSec)
+static void vBuildBeacon(uint8_t* ucMsgBuf, int32_t lSyncTimeSec)
 {
+	uint16_t uiSubSeconds;
+	uint8_t ucPacketSize;
 
-	uint uiSubSeconds;
-	uchar ucPacketSize;
+	REQUIRE(ucMsgBuf);
 
-	/* STUFF MSG TYPE */
-	ucaMSG_BUFF[MSG_IDX_ID] = MSG_ID_BEACON;
-
-	// Stuff the message flags
-	ucaMSG_BUFF[MSG_IDX_FLG] = 0x20;
-
-	// Stuff the message number
-	ucaMSG_BUFF[MSG_IDX_NUM_HI] = 0x00;
-	ucaMSG_BUFF[MSG_IDX_NUM_LO] = 0x00;
+    // Stuff the message type, flags, number, level, and length
+	ucMsgBuf[MSG_IDX_ID]        = MSG_ID_BEACON;
+	ucMsgBuf[MSG_IDX_FLG]       = 0x20;
+	ucMsgBuf[MSG_IDX_NUM_HI]    = 0x00;
+	ucMsgBuf[MSG_IDX_NUM_LO]    = 0x00;
+    ucMsgBuf[MSG_IDX_LEN]       = 16;
+    ucMsgBuf[MSG_IDX_SRC_LEVEL] = ucGLOB_myLevel;
 
 	//Stuff the source address
-	vL2FRAM_copySnumLo16ToBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI]);
-
-	// Write the message length
-	ucaMSG_BUFF[MSG_IDX_LEN] = 16;
+	vL2FRAM_copySnumLo16ToBytes(&ucMsgBuf[MSG_IDX_ADDR_HI]);
 
 	//Stuff group ID
-	ucaMSG_BUFF[MSG_IDX_GID_HI] = ucGID_getWholeSysGidHiByte();
-	ucaMSG_BUFF[MSG_IDX_GID_LO] = ucGID_getWholeSysGidLoByte();
+	ucMsgBuf[MSG_IDX_GID_HI] = ucGID_getWholeSysGidHiByte();
+	ucMsgBuf[MSG_IDX_GID_LO] = ucGID_getWholeSysGidLoByte();
 
 	//Stuff the sub-second time in seconds
-	vMISC_copyUlongIntoBytes((ulong) lSyncTimeSec, (uchar *) &ucaMSG_BUFF[BCNMSG_IDX_TIME_SEC_XI], NO_NOINT);
+	vMISC_copyUlongIntoBytes((uint32_t) lSyncTimeSec, &ucMsgBuf[BCNMSG_IDX_TIME_SEC_XI], NO_NOINT);
 
 	// Fetch the subsecond time and load it
 	uiSubSeconds = uiTIME_getSubSecAsUint();
-	ucaMSG_BUFF[BCNMSG_IDX_TIME_SUBSEC_HI] = (uchar)(uiSubSeconds >> 8);
-	ucaMSG_BUFF[BCNMSG_IDX_TIME_SUBSEC_LO] = (uchar) uiSubSeconds;
-
-	//Stuff the distance (in hops) from the hub
-	ucaMSG_BUFF[MSG_IDX_SRC_LEVEL] = ucGLOB_myLevel;
+	ucMsgBuf[BCNMSG_IDX_TIME_SUBSEC_HI] = (uint8_t)(uiSubSeconds >> 8);
+	ucMsgBuf[BCNMSG_IDX_TIME_SUBSEC_LO] = (uint8_t) uiSubSeconds;
 
 	// Set the packet size
-	ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+	ucPacketSize = ucMsgBuf[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
 
 	/* COMPUTE THE CRC */
-	ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucaMSG_BUFF, ucPacketSize);
+	ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucMsgBuf, ucPacketSize);
 
-	// Debug - Show the beacon message
-#if 0
-	uint8 ucCounter;
+} //END: vBuildBeacon()
 
-	vSERIAL_sout("Beacon:\r\n", 9);
-	for(ucCounter=0;ucCounter<(ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ);ucCounter++)
-	{
-		vSERIAL_HB8out(ucaMSG_BUFF[ucCounter]);
-		vSERIAL_crlf();
-	}
-#endif
 
-} //END: vComm_Msg_buildBeacon()
 
 ///////////////////////////////////////////////////////////////////////////////
 //! \brief Waits for the request to join message
@@ -280,68 +223,54 @@ static void vComm_Msg_buildBeacon(long lSyncTimeSec)
 //! \param none
 //! \return 0 for success or 1 for failure
 ///////////////////////////////////////////////////////////////////////////////
-static signed char cComm_WaitFor_RequesttoJoin(void)
+static int8_t cWaitForRequestToJoin(void)
 {
-	uchar ucIntegrityRetVal;
-	uint uiOtherGuysSN;
-	ulong uslRandNum;
-	uchar ucEdgeCount;
-	uchar ucTotalEdges;
-	uchar ucMsgIndex;
-	S_Edge S_Edges[10];
-	uchar ucFoundTskIndex;
-	signed char cRetVal;
+    enum
+    {
+        chkMsgFields  = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
+        rprtMsgFields = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN
+    };
 
-	// Assume timeout
-	cRetVal = -1;
+    int8_t   cRetVal           = -1;  // Assume timeout
+	uint8_t  ucIntegrityRetVal;
+	uint16_t uiOtherGuysSN;
+	uint32_t uslRandNum;
+	uint8_t  ucTotalEdges;
+	uint8_t  ucMsgIndex;
+	S_Edge   S_Edges[10];
+	uint8_t  ucFoundTskIndex;
+	uint8_t  ucMsgBuf[MAX_RESERVED_MSG_SIZE];
+    uint8_t  ucDEBuf[MAX_DE_LEN];
 
 	vTime_SetLinkSlotAlarm(ON);
 
 	//Wait for replies
-	while (TRUE) {
+	while (TRUE)
+	{
 		// Start the receiver and wait for RTJ
 		vADF7020_TXRXSwitch(RADIO_RX_MODE);
 
-		if (ucComm_waitForMsgOrTimeout(NO_RSSI) == 0) {
-
+		if (ucComm_waitForMsgOrTimeout(ucMsgBuf, MAX_RESERVED_MSG_SIZE, false) == 0)
+		{
 			// Time is up, exit
 			break;
 		}
-		else //Something has been received
+		else
 		{
 			//Check the message integrity
-			//RET: Bit Err Mask, 0 if OK
-			ucIntegrityRetVal = ucComm_chkMsgIntegrity(
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
-					MSG_ID_REQUEST_TO_JOIN, //msg type
-					0, //src SN
-					uiL2FRAM_getSnumLo16AsUint() //Dst SN
-					);
+			ucIntegrityRetVal = ucComm_chkMsgIntegrity(ucMsgBuf, chkMsgFields, rprtMsgFields, MSG_ID_REQUEST_TO_JOIN, 0, uiL2FRAM_getSnumLo16AsUint());
+
 			// If the message is good
-			if (ucIntegrityRetVal == 0) {
-
-#if 0
-				// Debug - Show the RTJ message
-				uint8 ucCounter;
-
-				vSERIAL_sout("RTJ Message:\r\n", 14);
-				for (ucCounter = 0; ucCounter < ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ; ucCounter++)
-				{
-					vSERIAL_HB8out(ucaMSG_BUFF[ucCounter]);
-					vSERIAL_crlf();
-				}
-#endif
-
+			if (ucIntegrityRetVal == 0)
+			{
 				//Save message data
-				uiOtherGuysSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI], NO_NOINT);
-
-				uslRandNum = ulMISC_buildUlongFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
+				uiOtherGuysSN = uiMISC_buildUintFromBytes(&ucMsgBuf[MSG_IDX_ADDR_HI], NO_NOINT);
+				uslRandNum    = ulMISC_buildUlongFromBytes(&ucMsgBuf[MSG_IDX_RANDSEED_XI], NO_NOINT);
 
 				/* STASH THE LINKUP SN */
 				uiaLinkSN[ucLinkSNidx++] = uiOtherGuysSN;
 
-				ucTotalEdges = ucaMSG_BUFF[MSG_IDX_NUM_EDGES];
+				ucTotalEdges = ucMsgBuf[MSG_IDX_NUM_EDGES];
 
 #if 1
 				/* REPORT TO CONSOLE */
@@ -352,48 +281,43 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 
 				ucMsgIndex = MSG_IDX_EDGE_DISC;
 
-				for (ucEdgeCount = 0; ucEdgeCount < ucTotalEdges; ucEdgeCount++) {
-					S_Edges[ucEdgeCount].m_uiSrc = (uint) (ucaMSG_BUFF[ucMsgIndex++] << 8);
-					S_Edges[ucEdgeCount].m_uiSrc |= (uint) ucaMSG_BUFF[ucMsgIndex++];
-					S_Edges[ucEdgeCount].m_uiDest = (uint) (ucaMSG_BUFF[ucMsgIndex++] << 8);
-					S_Edges[ucEdgeCount].m_uiDest |= (uint) ucaMSG_BUFF[ucMsgIndex++];
+				for (uint8_t i = 0; i < ucTotalEdges; ++i)
+				{
+					S_Edges[i].m_uiSrc   = (uint16_t) (ucMsgBuf[ucMsgIndex++] << 8);
+					S_Edges[i].m_uiSrc  |= (uint16_t) ucMsgBuf[ucMsgIndex++];
+					S_Edges[i].m_uiDest  = (uint16_t) (ucMsgBuf[ucMsgIndex++] << 8);
+					S_Edges[i].m_uiDest |= (uint16_t) ucMsgBuf[ucMsgIndex++];
 				}
 
-				ucRoute_NodeJoin(0, uiOtherGuysSN, S_Edges, (int) ucTotalEdges);
+				ucRoute_NodeJoin(0, uiOtherGuysSN, S_Edges, (int16_t) ucTotalEdges);
 
 				// If a RTJ is received from a node that is already in the task list then it must have
 				// dropped the link.  Therefore, we delete the task and initiate a new link with the node.
 				// This assumes that there are no duplicate node IDs in the network
 				ucFoundTskIndex = ucTask_SearchforLink(uiOtherGuysSN);
 
-				if (ucFoundTskIndex != INVALID_TASKINDEX) {
-
-					// Remove the node from the link block table
+				if (ucFoundTskIndex != INVALID_TASKINDEX)
+				{
+                    // If the node has been found then remove it from the link block, routing table, and remove the task
 					ucLNKBLK_RemoveNode(uiOtherGuysSN);
-
-					// Remove the node and all its descendants from the edge list
 					ucRoute_NodeUnjoin(uiOtherGuysSN);
-
-					// Destroy this task
 					ucTask_DestroyTask(ucFoundTskIndex);
 
-				// Build the report data element stating that the link has been broken
-				vComm_DE_BuildReportHdr(CP_ID, 4, ucMAIN_GetVersion());
-				ucMsgIndex = DE_IDX_RPT_PAYLOAD;
+                    // Build the report data element stating that the link has been broken
+                    vComm_DE_BuildReportHdr(ucDEBuf, CP_ID, 4, ucMAIN_GetVersion());
+                    ucMsgIndex = DE_IDX_RPT_PAYLOAD;
 
-				ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_LINK_BROKEN;
-				ucaMSG_BUFF[ucMsgIndex++] = 2; // data length
-				ucaMSG_BUFF[ucMsgIndex++] = (uchar) (uiOtherGuysSN >> 8);
-				ucaMSG_BUFF[ucMsgIndex++] = (uchar) uiOtherGuysSN;
+                    ucDEBuf[ucMsgIndex++] = SRC_ID_LINK_BROKEN;
+                    ucDEBuf[ucMsgIndex++] = 2; // data length
+                    ucDEBuf[ucMsgIndex++] = (uchar) (uiOtherGuysSN >> 8);
+                    ucDEBuf[ucMsgIndex++] = (uchar) uiOtherGuysSN;
 
-				// Store DE
-				vReport_LogDataElement(RPT_PRTY_LINK_BROKEN);
+                    // Store DE
+                    vReport_LogDE(ucDEBuf, RPT_PRTY_LINK_BROKEN);
 				}
 
 				// Create the operational message task here
-				ucTask_CreateOMTask(uiOtherGuysSN, //SN
-						uslRandNum, //Random seed
-						PARENT);
+				ucTask_CreateOMTask(uiOtherGuysSN, uslRandNum, PARENT);
 
 #if 1
 				/* REPORT TO CONSOLE */
@@ -416,7 +340,7 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 
 	return cRetVal;
 
-} //END: ucComm_BeaconReply()
+} //END: cWaitForRequestToJoin()
 
 ///////////////////////////////////////////////////////////////////////////////
 //! \brief Sends the beacon message
@@ -426,17 +350,19 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 ///////////////////////////////////////////////////////////////////////////////
 void vComm_SendBeacon(void)
 {
+    enum
+    {
+        numBeacons = 2
+    };
+
 	long lCurSec;
 	signed char cReply;
 	uchar ucc;
 	uchar i = 0;
 	uchar ucPayloadLength;
 	uchar ucMsgIndex;
-	uchar ucResponseCount;
-	uchar ucLinkIndx;
-
-	// Init link SN index
-	ucLinkSNidx = 0;
+	uchar ucResponseCount = 0;
+	uchar ucLinkIdx       = 0;
 
 	//Set the channel
 	unADF7020_SetChannel(DISCOVERY_CHANNEL);
@@ -447,16 +373,13 @@ void vComm_SendBeacon(void)
 	//Get the current time
 	lCurSec = lTIME_getSysTimeAsLong();
 
-	// Assume no responses
-	ucResponseCount = 0;
-
-	while (i < 2)
+	while (i < numBeacons)
 	{
 		//Prepend network layer with an illegal destination address
 		vComm_NetPkg_buildHdr(0xFFFF);
 
 		//Build the Beacon message
-		vComm_Msg_buildBeacon(lCurSec);
+		vBuildBeacon(lCurSec);
 
 		//Load message into TX buffer.
 		vADF7020_SetPacketLength(ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ);
@@ -471,7 +394,7 @@ void vComm_SendBeacon(void)
 		// Init cReply
 		cReply = 0;
 			//Wait for replies from nodes
-		cReply = cComm_WaitFor_RequesttoJoin();
+		cReply = cWaitForRequestToJoin();
 
 		// If there wasn't a time out then add the responses
 		if (cReply != -1) {
@@ -514,7 +437,7 @@ void vComm_SendBeacon(void)
 	}
 
 	// Store DE
-	vReport_LogDataElement(RPT_PRTY_CHILD_JOINED);
+	vReport_LogDE(ucDEBuf, RPT_PRTY_CHILD_JOINED);
 
 } //END: vComm_SendBeacon()
 
@@ -718,7 +641,7 @@ void vComm_Request_to_Join(void)
 		vComm_NetPkg_buildHdr(uiDest);
 
 		//Build the request to join message
-		vComm_Msg_buildRequest_to_Join(uslRandSeed);
+		vBuildRequestToJoin(uslRandSeed);
 
 		//Send the Message
 		ucComm_doSubSecXmit(ulSlotStartTime_sec, uiMsgXmitOffset_clks, USE_CLK2, NO_RECEIVER_START);
@@ -778,6 +701,36 @@ void vComm_Request_to_Join(void)
 	}
 
 } //End: vComm_Request_to_Join()
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+//! \fn vSetDiscMode
+//! \brief Sets the discovery mode
+//! \param ucMode, the desired mode
+///////////////////////////////////////////////////////////////////////////////
+void vComm_SetDiscMode(uint8_t ucMode)
+{
+    S_Discovery.m_ucMode        = ucMode;
+    S_Discovery.m_ulStartTime   = lTIME_getSysTimeAsLong();
+    S_Discovery.m_ulMaxDuration = ulaDiscDuration[ucMode];
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+//! \fn vGetDiscMode
+//! \brief Gets the current discovery settings
+//! \param *S_Disc
+///////////////////////////////////////////////////////////////////////////////
+void vComm_GetDiscMode(T_Discovery *S_Disc)
+{
+    S_Disc->m_ucMode        = S_Discovery.m_ucMode;
+    S_Disc->m_ulStartTime   = S_Discovery.m_ulStartTime;
+    S_Disc->m_ulMaxDuration = S_Discovery.m_ulMaxDuration;
+}
+
+
 
 //! @}
 
