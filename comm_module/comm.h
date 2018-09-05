@@ -15,6 +15,12 @@
 #include <stdbool.h>
 #include "task.h"
 
+enum
+{
+    noRSSI,
+    yesRSSI,
+
+};
 //! @name Data Element definitions
 //! {
 //! \def TRANSDUCER_LABEL_LEN
@@ -372,9 +378,9 @@ typedef struct{
 //! \struct S_Discovery
 //! \brief Holds discovery state information
 typedef struct {
-		uint8 m_ucMode;
-		ulong m_ulStartTime;  		//!< Time spent in a particular mode mode discovery started
-		ulong m_ulMaxDuration;  //!< Maximum time allowed in a particular mode
+		uint8_t m_ucMode;
+		uint32_t m_ulStartTime;    //!< Time spent in a particular mode mode discovery started
+		uint32_t m_ulMaxDuration;  //!< Maximum time allowed in a particular mode
 }T_Discovery;
 
 
@@ -775,16 +781,16 @@ union SP_LabelMessage
 #define BROKEN_LINK_MAX_COUNT		3
 
 
-void vComm_DE_BuildReportHdr(uint8_t* ucBuf, uchar ucProcID, uchar ucPayloadLen, uchar ucVersion);
-void vComm_NetPkg_buildHdr(uint uiDest);
+void vComm_DE_BuildReportHdr(uint8_t* ucBuf, uint8_t ucProcID, uint8_t ucPayloadLen, uint8_t ucVersion);
+void vComm_NetPkg_buildHdr(uint8_t* ucMsgBuf, uint16_t uiDest);
 
 uint8_t ucComm_chkMsgIntegrity(uint8_t* ucMsgBuf, uint8_t ucChkBits, uint8_t ucReportBits, uint8_t ucMsgType, uint16_t uiExpectedSrcSN, uint16_t uiExpectedDestSN);
 
-void vComm_showSNmismatch(uint uiExpectedVal, uint uiGotVal, uchar ucCRLF_flag //YES_CRLF, NO_CRLF
+void vComm_showSNmismatch(uint16_t uiExpectedVal, uint16_t uiGotVal, uint8_t ucCRLF_flag //YES_CRLF, NO_CRLF
     );
 
 void vComm_SendBeacon(void);
-void vComm_Request_to_Join(void);
+void vComm_RequestToJoin(void);
 
 void vComm_Child(void);
 void vComm_Parent(void);

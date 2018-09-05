@@ -33,7 +33,6 @@
 #include "main.h"				// For getting software version
 #include "ota.h"					// Handlers for program code
 ///////////////////   externs    /////////////////////////
-extern volatile uint8 ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
 extern uchar g_ucaCurrentTskIndex;
 extern int iGLOB_completeSysLFactor;
 extern uint uiGLOB_lostROM2connections; //counts lost ROM2's
@@ -75,8 +74,6 @@ ulong g_ulLastCommTime = 0;
 uchar ucComm_WaitForAck(uint uiMsgNumber);
 void vComm_SendAck(uint uiMsgNumber);
 
-//TODO remove
-long ulRand = 0;
 
 /////////////////////////////////////////////////////////////////////////////
 //!

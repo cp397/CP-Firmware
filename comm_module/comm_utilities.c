@@ -59,8 +59,6 @@ union DE_Report UReportDE;
 //! \brief This union contains the fields required for a program code update data element
 union DE_Code UCodeDE;
 
-extern volatile uint8 ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
-
 extern uint uiGLOB_curMsgSeqNum;
 
 extern volatile union //ucFLAG1_BYTE
@@ -158,14 +156,14 @@ static const T_Text S_MsgName[MSG_TYPE_MAX_COUNT] =
 //! \param none
 //! \return none
 ///////////////////////////////////////////////////////////////////////////////
-void vComm_NetPkg_buildHdr(uint uiDest)
+void vComm_NetPkg_buildHdr(uint8_t* ucMsgBuf, uint uiDest)
 {
 	//Stuff the destination address
-	ucaMSG_BUFF[NET_IDX_DEST_HI] = (uchar) (uiDest >> 8);
-	ucaMSG_BUFF[NET_IDX_DEST_LO] = (uchar) (uiDest);
+    ucMsgBuf[NET_IDX_DEST_HI] = (uchar) (uiDest >> 8);
+    ucMsgBuf[NET_IDX_DEST_LO] = (uchar) (uiDest);
 
 	// Stuff the source address
-	vL2FRAM_copySnumLo16ToBytes((uchar *) &ucaMSG_BUFF[NET_IDX_SRC_HI]);
+	vL2FRAM_copySnumLo16ToBytes((uchar *) &ucMsgBuf[NET_IDX_SRC_HI]);
 
 } //END: vComm_NetPkg_buildHdr()
 

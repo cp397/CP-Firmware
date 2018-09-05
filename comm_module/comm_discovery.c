@@ -10,24 +10,22 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include <stdint.h>
-#include <msp430x54x.h>		//processor reg description */
-#include "../time_wisard.h"					//Time routines
-#include "comm.h"    			//event MSG module
-#include "buz.h"					//Buzzer
-#include "adf7020.h"			//radio driver
-#include "L2fram.h" 			//Level 2 Fram routines
-#include "l2sram.h"  			//disk storage module
-#include "misc.h"					//homeless functions
-#include "crc.h"					//CRC calculation module
-#include "gid.h"					//group ID routines
-#include "serial.h"				//serial IO port stuff
-#include "rand.h"					//random number generator
-#include "task.h"					//Task management module
-#include "rts.h" 					//scheduling functions
-#include "report.h"				//Logging module
-#include "main.h"					// For getting software version
-#include "lnkblk.h"				// Link information
-#include "contracts.h"
+#include <msp430x54x.h>     //processor reg description */
+#include "../time_wisard.h"	//Time routines
+#include "comm.h"           //event MSG module
+#include "buz.h"            //Buzzer
+#include "adf7020.h"        //radio driver
+#include "L2fram.h"         //Level 2 Fram routines
+#include "misc.h"           //homeless functions
+#include "crc.h"            //CRC calculation module
+#include "gid.h"            //group ID routines
+#include "serial.h"         //serial IO port stuff
+#include "rand.h"           //random number generator
+#include "task.h"           //Task management module
+#include "report.h"         //Logging module
+#include "main.h"           // For getting software version
+#include "lnkblk.h"         // Link information
+#include "contracts.h"      // contract based design functions
 
 /////////////////// defines //////////////////////
 #define MAX_LINKS_PER_SLOT		3
@@ -98,14 +96,13 @@ static const uint ucaLinkSlotTimes[MAX_LINKS_PER_SLOT] =
 { 0x0000, 0x0400, 0x0800 };
 
 static uint16_t uiaLinkSN[MAX_LINKS_PER_SLOT];
-static uint8_t  ucLinkSNidx;
 
 // Structure containing discovery modes and settings (Initial state is invalid)
 static T_Discovery S_Discovery = {0xFF, 0, 0};
 
 //! \var ulaDiscDuration
 //! \brief Durations(in seconds) allowed in each discovery mode
-static const ulong ulaDiscDuration[MAXDISCOVERYMODES] = {0, 60, 14400};
+static const uint32_t ulaDiscDuration[MAXDISCOVERYMODES] = {0, 60, 14400};
 
 /************************** Code starts here *********************************/
 
@@ -227,8 +224,8 @@ static int8_t cWaitForRequestToJoin(void)
 {
     enum
     {
-        chkMsgFields  = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
-        rprtMsgFields = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN
+        chkFields  = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
+        rptFields = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN
     };
 
     int8_t   cRetVal           = -1;  // Assume timeout
@@ -241,6 +238,7 @@ static int8_t cWaitForRequestToJoin(void)
 	uint8_t  ucFoundTskIndex;
 	uint8_t  ucMsgBuf[MAX_RESERVED_MSG_SIZE];
     uint8_t  ucDEBuf[MAX_DE_LEN];
+    uint8_t  ucLinkSNidx;
 
 	vTime_SetLinkSlotAlarm(ON);
 
@@ -250,7 +248,7 @@ static int8_t cWaitForRequestToJoin(void)
 		// Start the receiver and wait for RTJ
 		vADF7020_TXRXSwitch(RADIO_RX_MODE);
 
-		if (ucComm_waitForMsgOrTimeout(ucMsgBuf, MAX_RESERVED_MSG_SIZE, false) == 0)
+		if (ucComm_waitForMsgOrTimeout(ucMsgBuf, MAX_RESERVED_MSG_SIZE, noRSSI) == 0)
 		{
 			// Time is up, exit
 			break;
@@ -258,7 +256,7 @@ static int8_t cWaitForRequestToJoin(void)
 		else
 		{
 			//Check the message integrity
-			ucIntegrityRetVal = ucComm_chkMsgIntegrity(ucMsgBuf, chkMsgFields, rprtMsgFields, MSG_ID_REQUEST_TO_JOIN, 0, uiL2FRAM_getSnumLo16AsUint());
+			ucIntegrityRetVal = ucComm_chkMsgIntegrity(ucMsgBuf, chkFields, rptFields, MSG_ID_REQUEST_TO_JOIN, 0, uiL2FRAM_getSnumLo16AsUint());
 
 			// If the message is good
 			if (ucIntegrityRetVal == 0)
@@ -309,8 +307,8 @@ static int8_t cWaitForRequestToJoin(void)
 
                     ucDEBuf[ucMsgIndex++] = SRC_ID_LINK_BROKEN;
                     ucDEBuf[ucMsgIndex++] = 2; // data length
-                    ucDEBuf[ucMsgIndex++] = (uchar) (uiOtherGuysSN >> 8);
-                    ucDEBuf[ucMsgIndex++] = (uchar) uiOtherGuysSN;
+                    ucDEBuf[ucMsgIndex++] = (uint8_t) (uiOtherGuysSN >> 8);
+                    ucDEBuf[ucMsgIndex++] = (uint8_t) uiOtherGuysSN;
 
                     // Store DE
                     vReport_LogDE(ucDEBuf, RPT_PRTY_LINK_BROKEN);
@@ -355,14 +353,16 @@ void vComm_SendBeacon(void)
         numBeacons = 2
     };
 
-	long lCurSec;
-	signed char cReply;
-	uchar ucc;
-	uchar i = 0;
-	uchar ucPayloadLength;
-	uchar ucMsgIndex;
-	uchar ucResponseCount = 0;
-	uchar ucLinkIdx       = 0;
+	int32_t lCurSec;
+	int8_t cReply;
+	uint8_t ucc;
+	uint8_t i = 0;
+	uint8_t ucPayloadLength;
+	uint8_t ucMsgIndex;
+	uint8_t ucResponseCount = 0;
+    uint8_t ucMsgBuf[MAX_RESERVED_MSG_SIZE];
+    uint8_t ucDEBuf[MAX_DE_LEN];
+    uint8_t ucLinkIndx;
 
 	//Set the channel
 	unADF7020_SetChannel(DISCOVERY_CHANNEL);
@@ -376,14 +376,14 @@ void vComm_SendBeacon(void)
 	while (i < numBeacons)
 	{
 		//Prepend network layer with an illegal destination address
-		vComm_NetPkg_buildHdr(0xFFFF);
+		vComm_NetPkg_buildHdr(ucMsgBuf, 0xFFFF);
 
 		//Build the Beacon message
-		vBuildBeacon(lCurSec);
+		vBuildBeacon(ucMsgBuf, lCurSec);
 
 		//Load message into TX buffer.
-		vADF7020_SetPacketLength(ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ);
-		unADF7020_LoadTXBuffer((uint8*) &ucaMSG_BUFF);
+		vADF7020_SetPacketLength(ucMsgBuf[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ);
+		unADF7020_LoadTXBuffer((uint8*) &ucMsgBuf);
 
 		// Set state to TX mode
 		vADF7020_TXRXSwitch(RADIO_TX_MODE);
@@ -391,25 +391,21 @@ void vComm_SendBeacon(void)
 		//Send the Message
 		vADF7020_SendMsg();
 
-		// Init cReply
+		// Init cReply and wait for replies from nodes
 		cReply = 0;
-			//Wait for replies from nodes
 		cReply = cWaitForRequestToJoin();
 
 		// If there wasn't a time out then add the responses
-		if (cReply != -1) {
+		if (cReply != -1)
 			ucResponseCount += cReply;
-		}
 
 		// If there is no room left in the link table then exit
 		if(ucLNKBLK_FindEmptyBlk(&ucLinkIndx) != 0)
 			break;
 
-		// Increment the breakout condition
 		i++;
 	}
 
-	//Shutdown the radio
 	vADF7020_Quit();
 
 	// If there was a timeout or no nodes replied then exit
@@ -420,24 +416,23 @@ void vComm_SendBeacon(void)
 	ucPayloadLength = ucResponseCount * 2 + 2;
 
 	// Build the report data element header
-	vComm_DE_BuildReportHdr(CP_ID, ucPayloadLength, ucMAIN_GetVersion());
+	vComm_DE_BuildReportHdr(ucDEBuf, CP_ID, ucPayloadLength, ucMAIN_GetVersion());
 	ucMsgIndex = DE_IDX_RPT_PAYLOAD;
-	ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_CHILD_JOINED;
-	ucaMSG_BUFF[ucMsgIndex++] = ucResponseCount * 2;
+	ucDEBuf[ucMsgIndex++] = SRC_ID_CHILD_JOINED;
+	ucDEBuf[ucMsgIndex++] = ucResponseCount * 2;
 	// Write the serial numbers of the joined nodes to the report
 	for (ucc = 0; ucc < ucResponseCount; ucc++)
 	{
-		ucaMSG_BUFF[ucMsgIndex++] = (uchar) (uiaLinkSN[ucc] >> 8);
-		ucaMSG_BUFF[ucMsgIndex++] = (uchar) uiaLinkSN[ucc];
+	    ucDEBuf[ucMsgIndex++] = (uint8_t) (uiaLinkSN[ucc] >> 8);
+	    ucDEBuf[ucMsgIndex++] = (uint8_t) uiaLinkSN[ucc];
 	}
 
 	//Indicate to listeners that the link is established
-	if (ucResponseCount != 0) {
+	if (ucResponseCount != 0)
 		vBUZ_tune_Blip();
-	}
 
 	// Store DE
-	vReport_LogDE(ucDEBuf, RPT_PRTY_CHILD_JOINED);
+    vReport_LogDE(ucDEBuf, RPT_PRTY_CHILD_JOINED);
 
 } //END: vComm_SendBeacon()
 
@@ -448,34 +443,37 @@ void vComm_SendBeacon(void)
 //! @param none
 //! @return ucReturnCode: 1 if failed, 0 for success
 ///////////////////////////////////////////////////////////////////////////////
-static uchar ucComm_WaitFor_Beacon(void)
+static uint8_t ucWaitForBeacon(uint8_t* ucMsgBuf)
 {
-	uchar ucReturnCode; //!< Return code
-	uchar ucSrcLevel; //!< Source level in network
-	uint uiSrcSN; //!< Serial number of source
-	uchar ucFoundStblIdx; //!<Index of source in scheduler table if it exists
+    enum
+    {
+        chkFlags = CHKBIT_CRC + CHKBIT_MSG_TYPE,
+        rptFlags = 0
+    };
+
+	uint8_t  ucReturnCode;   //!< Return code
+	uint8_t  ucSrcLevel;     //!< Source level in network
+	uint16_t uiSrcSN;        //!< Serial number of source
+	uint8_t  ucFoundStblIdx; //!<Index of source in scheduler table if it exists
+
+	REQUIRE(ucMsgBuf);
 
 	// Assume that we have already timed out
 	ucReturnCode = TIMEOUTERR;
 
-	while (ucTimeCheckForAlarms(SUBSLOT_WARNING_ALARM_BIT) == 0) {
+	while (ucTimeCheckForAlarms(SUBSLOT_WARNING_ALARM_BIT) == 0)
+	{
 		//There is still time, reset return code
 		ucReturnCode = 0x00;
 
-		if (ucComm_waitForMsgOrTimeout(YES_RSSI)) {
-
-			/* GOT A MSG -- CHK FOR: CRC, MSGTYPE, GROUPID, DEST_SN */
-			if (!(ucComm_chkMsgIntegrity( //RET: Bit Err Mask, 0 if OK
-					CHKBIT_CRC + CHKBIT_MSG_TYPE, //chk flags
-					0, //CHKBIT_CRC + CHKBIT_MSG_TYPE, //report flags
-					MSG_ID_BEACON, //msg type
-					0, //src SN
-					0 //Dst SN
-					))) {
-
+        if (ucComm_waitForMsgOrTimeout(ucMsgBuf, MAX_RESERVED_MSG_SIZE, yesRSSI))
+        {
+			if (ucComm_chkMsgIntegrity(ucMsgBuf, chkFlags, rptFlags, MSG_ID_BEACON, 0, 0) == 0)
+			{
 				//check the link level to make sure that the network maintains the child to parent tree structure
-				ucSrcLevel = ucaMSG_BUFF[MSG_IDX_SRC_LEVEL];
-				if (ucSrcLevel >= ucGLOB_myLevel) {
+				ucSrcLevel = ucMsgBuf[MSG_IDX_SRC_LEVEL];
+				if (ucSrcLevel >= ucGLOB_myLevel)
+				{
 #if 0
 					/* POST A REJECT MSG */
 					vSERIAL_sout("Bcn Rjt:Lvl, My=", 16);
@@ -489,11 +487,12 @@ static uchar ucComm_WaitFor_Beacon(void)
 				}
 
 				//Check for a pre-existing link to avoid multiple links between the same nodes
-				uiSrcSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI], NO_NOINT);
+				uiSrcSN = uiMISC_buildUintFromBytes((uint8_t*) &ucMsgBuf[MSG_IDX_ADDR_HI], NO_NOINT);
 				ucFoundStblIdx = ucTask_SearchforLink(uiSrcSN);
 
 				/* IF PRE-EXISTING -- DON'T RECONNECT */
-				if (ucFoundStblIdx != 0xFF) {
+				if (ucFoundStblIdx != 0xFF)
+				{
 #if 0
 					/* REPORT TO CONSOLE THAT WE ALREADY HAVE THIS LINK */
 					vSERIAL_sout("Beacon Rejected:PrevLk=", 23);
@@ -512,13 +511,14 @@ static uchar ucComm_WaitFor_Beacon(void)
 					break;
 
 			}
-			else {
+			else
+			{
 				//If we are here then the message failed the integrity check
 				ucReturnCode |= MSGINTGRTYERR; //set the message integrity error flag
 			}
 		} //End: if(ucComm_waitForMsgOrTimeout)
-		else {
-
+		else
+		{
 			//The slot timed out before a message was received
 			ucReturnCode |= TIMEOUTERR;
 			break;
@@ -528,7 +528,7 @@ static uchar ucComm_WaitFor_Beacon(void)
 		vADF7020_TXRXSwitch(RADIO_RX_MODE);
 	}
 	return ucReturnCode;
-} //END: ucComm_Wait_for_Beacon()
+} //END: ucWaitForBeacon()
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -542,17 +542,19 @@ static uchar ucComm_WaitFor_Beacon(void)
 //! @param none
 //! @return none
 ///////////////////////////////////////////////////////////////////////////////
-void vComm_Request_to_Join(void)
+void vComm_RequestToJoin(void)
 {
-	ulong uslRandSeed;
-	ulong ulRandLinkSlot;
-	ulong ulSlotStartTime_sec;
+    uint32_t uslRandSeed;
+	uint32_t ulRandLinkSlot;
+	uint32_t ulSlotStartTime_sec;
 	uint uiMsgXmitOffset_clks;
 	uint uiDest;
 	uint uiSubSecLatency;
 	uint uiSubSecTemp;
 	uint uiOtherGuysSN;
-	uchar ucMsgIndex;
+	uint8_t ucMsgIndex;
+	uint8_t ucMsgBuf[MAX_RESERVED_MSG_SIZE];
+	uint8_t ucDEBuf[MAX_DE_LEN];
 
 	/* INC THE RTJ COUNTER */
 	uiGLOB_TotalRTJ_attempts++;
@@ -570,7 +572,8 @@ void vComm_Request_to_Join(void)
 	vADF7020_WakeUp();
 
 	//if we have received a beacon message
-	if (ucComm_WaitFor_Beacon() == 0) {
+	if (ucWaitForBeacon(ucMsgBuf) == 0)
+	{
 		//Stop the latency timer
 		vTime_LatencyTimer(OFF);
 
@@ -578,10 +581,10 @@ void vComm_Request_to_Join(void)
 		uiSubSecLatency = LATENCY_TIMER;
 
 		// Save the new time in Clk2, therefore Clk1 and alarms are still good
-		vTIME_setClk2FromBytes((uchar *) &ucaMSG_BUFF[BCNMSG_IDX_TIME_SEC_XI]);
+		vTIME_setClk2FromBytes(&ucMsgBuf[BCNMSG_IDX_TIME_SEC_XI]);
 
 		// Determine the new timer value from the current value + measured value + constant
-		uiSubSecTemp = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[BCNMSG_IDX_TIME_SUBSEC_HI], 0);
+		uiSubSecTemp = uiMISC_buildUintFromBytes(&ucMsgBuf[BCNMSG_IDX_TIME_SUBSEC_HI], 0);
 
 		uiSubSecTemp += (uiSubSecLatency + 0x69);
 
@@ -603,18 +606,18 @@ void vComm_Request_to_Join(void)
 		ucFLAG0_BYTE.FLAG0_STRUCT.FLG0_RESET_ALL_TIME_BIT = 1;
 
 		/* SAVE THE LEVEL */
-		ucGLOB_myLevel = ucaMSG_BUFF[MSG_IDX_SRC_LEVEL] + 1;
+		ucGLOB_myLevel = ucMsgBuf[MSG_IDX_SRC_LEVEL] + 1;
 
 		/* SAVE THE GROUP ID */
-		vGID_setWholeSysGidFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_GID_HI]);
+		vGID_setWholeSysGidFromBytes(&ucMsgBuf[MSG_IDX_GID_HI]);
 
 		//Save parent ID
-		uiOtherGuysSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI], NO_NOINT);
+		uiOtherGuysSN = uiMISC_buildUintFromBytes(&ucMsgBuf[MSG_IDX_ADDR_HI], NO_NOINT);
 
 		/*-----------------  COMPUTE THE RTJ REPLY TIME  ------------------------*/
 
 		// choose a random link slot to respond in
-		ulRandLinkSlot = (ulong) (ucRAND_getRolledMidSysSeed() % MAX_LINKS_PER_SLOT);
+		ulRandLinkSlot = (uint32_t) (ucRAND_getRolledMidSysSeed() % MAX_LINKS_PER_SLOT);
 
 #if 0
 		vSERIAL_sout("ulRandLinkSlot= ", 16);
@@ -623,25 +626,22 @@ void vComm_Request_to_Join(void)
 #endif
 
 		/* COMPUTE THE SLOT START TIME */
-		ulSlotStartTime_sec = (ulong) lTIME_getClk2AsLong();
-
-//		// TODO remove
-//		ulRandLinkSlot = 0;
+		ulSlotStartTime_sec = (uint32_t) lTIME_getClk2AsLong();
 
 		// Compute the reply time: time now + randomly selected offset
-		uiMsgXmitOffset_clks = uiSubSecTemp + ucaLinkSlotTimes[(uchar) ulRandLinkSlot];
+		uiMsgXmitOffset_clks = uiSubSecTemp + ucaLinkSlotTimes[(uint8_t) ulRandLinkSlot];
 
 		//Get a random seed to coordinate the next slot for communication
 		uslRandSeed = uslRAND_getRolledFullSysSeed(); //get a new rand seed
 
 		//copy the destination address into
-		uiDest = ((ucaMSG_BUFF[NET_IDX_SRC_HI] << 8) | ucaMSG_BUFF[NET_IDX_SRC_LO]);
+		uiDest = ((ucMsgBuf[NET_IDX_SRC_HI] << 8) | ucMsgBuf[NET_IDX_SRC_LO]);
 
 		//Build the network layer header
-		vComm_NetPkg_buildHdr(uiDest);
+		vComm_NetPkg_buildHdr(ucMsgBuf, uiDest);
 
 		//Build the request to join message
-		vBuildRequestToJoin(uslRandSeed);
+		vBuildRequestToJoin(ucMsgBuf, uslRandSeed);
 
 		//Send the Message
 		ucComm_doSubSecXmit(ulSlotStartTime_sec, uiMsgXmitOffset_clks, USE_CLK2, NO_RECEIVER_START);
@@ -673,26 +673,25 @@ void vComm_Request_to_Join(void)
 		vBUZ_tune_Blip();
 
 		// Create the operational message task here
-		ucTask_CreateOMTask(uiDest, //dest serial num
-				uslRandSeed, //Random seed
-				CHILD);
+		ucTask_CreateOMTask(uiDest, uslRandSeed, CHILD);
 
 		// Start the frequency synchronization index at 0
 		ucFreqAdjustIndex = 0;
 
 		// Build the report data element header
-		vComm_DE_BuildReportHdr(CP_ID, 4, ucMAIN_GetVersion());
+		vComm_DE_BuildReportHdr(ucDEBuf, CP_ID, 4, ucMAIN_GetVersion());
 		ucMsgIndex = DE_IDX_RPT_PAYLOAD;
-		ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_JOINED_NET;
-		ucaMSG_BUFF[ucMsgIndex++] = 2;
-		ucaMSG_BUFF[ucMsgIndex++] = (uchar) (uiDest >> 8);
-		ucaMSG_BUFF[ucMsgIndex++] = (uchar) uiDest;
+		ucDEBuf[ucMsgIndex++] = SRC_ID_JOINED_NET;
+		ucDEBuf[ucMsgIndex++] = 2;
+		ucDEBuf[ucMsgIndex++] = (uint8_t) (uiDest >> 8);
+		ucDEBuf[ucMsgIndex++] = (uint8_t) uiDest;
 
 		// Store DE
-		vReport_LogDataElement(RPT_PRTY_JOINED_NET);
+		vReport_LogDE(ucDEBuf, RPT_PRTY_JOINED_NET);
 
 	} //End: if(!ucComm_Wait_for_Beacon())
-	else {
+	else
+	{
 		//Shutdown the radio, no beacon received
 		vADF7020_Quit();
 

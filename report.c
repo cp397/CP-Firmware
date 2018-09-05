@@ -111,7 +111,7 @@ uint uiReport_RAM_QueueCount(void)
 //! \param none
 //! \return none
 ////////////////////////////////////////////////////////////////////////////////
-void vReport_LogDataElement(uint8_t* ucBuf, uint8_t ucPriority)
+void vReport_LogDE(uint8_t* ucBuf, uint8_t ucPriority)
 {
     uint8_t ucIndex;
     uint8_t ucDE_Length;
