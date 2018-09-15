@@ -846,18 +846,21 @@ uchar ucMSG_getLastFilledEntryInOM2( //RET: 0=none, ##=idx of last entry in OM2
 #define ROUTE_ERROR_INVALID_EDGE   0x40
 
 
+//! \def F_NONE
 //! \def F_DELETE
 //! \def F_JOIN
 //! \def F_DROP
 //! \brief Flags for updates to the routing module
-#define F_DELETE			0x01
-#define F_JOIN				0x02
-#define F_DROP				0x04
+#define F_NONE    0x00
+#define F_DELETE  0x01
+#define F_JOIN    0x02
+#define F_DROP    0x04
 
 typedef struct
 {
-	uint m_uiSrc;
-	uint m_uiDest;
+	uint  m_uiSrc;
+	uint  m_uiDest;
+	uchar m_flags
 } S_Edge;
 
 uchar ucRoute_Init(uint address);

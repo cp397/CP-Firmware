@@ -23,17 +23,6 @@ S_Edge S_edgeList[MAX_EDGES];
 uint uiSelf;
 
 
-// Updates to the edge list are stored in the following structure.  All nodes joining the network are added to the
-// update edge list, but since unjoining a node removes all descendants there is no need to add all dropped edges to
-// the update edge list.
-//! \struct S_Update
-//! \brief Contains all the pertinent information to temporarily store network updates and delete them as needed.
-struct {
-		S_Edge  m_ucaEdges[MAX_UPDATES];		//!< Edge list containing IDs of added or dropped nodes
-		uchar 	m_ucaFlags[MAX_UPDATES];
-		uchar 	ucIndex;								//!< Update index
-}S_RtUpdate;
-
 void vRouteClrAllUpdates(void);
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -79,18 +68,12 @@ uchar ucRoute_AddEdge(uint uiSrc, uint uiDest)
 		return ROUTE_ERROR_TABLE_FULL;
 
 	//Save the edge nodes and increment the pointer.  Also add the edges to the update list.
-	S_nextEdge->m_uiSrc = S_RtUpdate.m_ucaEdges[S_RtUpdate.ucIndex].m_uiSrc = uiSrc;
-	S_nextEdge->m_uiDest = S_RtUpdate.m_ucaEdges[S_RtUpdate.ucIndex].m_uiDest = uiDest;
-
-	// Set the join flag in the update list
-	S_RtUpdate.m_ucaFlags[S_RtUpdate.ucIndex] = F_JOIN;
+	S_nextEdge->m_uiSrc  = uiSrc;
+	S_nextEdge->m_uiDest = uiDest;
+    S_nextEdge->m_flags  = F_JOIN; // Set the join flag so the node will update the parents list
 
 	S_nextEdge++;					// Increment edge list pointer
 	uiNumEdges++;					// Increment the total number of edges
-
-	// Increment update index, prevent overflow
-	if(S_RtUpdate.ucIndex<(MAX_UPDATES-1))
-		S_RtUpdate.ucIndex++;
 
 	return (0);
 }
@@ -103,7 +86,7 @@ uchar ucRoute_AddEdge(uint uiSrc, uint uiDest)
 //! \param
 //! \return
 ////////////////////////////////////////////////////////////////////////////////
-uchar ucRoute_RemoveEdge(uint uiSrc, uint uiDest)
+static uchar ucRemoveEdge(uint uiSrc, uint uiDest)
 {
 	int i, j, uiFoundEdge;
 	S_Edge *S_ptr;
