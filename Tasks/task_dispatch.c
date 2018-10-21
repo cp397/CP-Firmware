@@ -11,6 +11,7 @@
 //!
 //////////////////////////////////////////////////////////////////////////////
 
+#include <stdbool.h>
 #include <time_wisard.h>		// Time keeping module
 #include "task.h" 	// task definitions
 #include "msp430.h"	// MCU definitions
@@ -141,7 +142,8 @@ void vTask_ModifyTCB(void)
 //////////////////////////////////////////////////////////////////////////
 void vTask_FRAM_to_SDCard(void)
 {
-	uchar ucBlock[SD_CARD_BLOCKLEN];
+	uchar ucBlock[SD_CARD_BLOCKLEN] = {0};
+    uchar ucVerifyBlock[SD_CARD_BLOCKLEN] = {0};
 	uchar ucAttemptCount;
 	ulong ulAddress;
 	uint uiCount;
@@ -149,6 +151,8 @@ void vTask_FRAM_to_SDCard(void)
 	uchar ucErrorCodePriority;
 	uchar ucMsgIndex;
 	const uchar ucTimeout = 50;
+	uint i;
+	bool verified = true;
 
 	// Get the next free SD card address from FRAM
 	ulAddress = ulL2FRAM_GetSDCardBlockNum();
@@ -160,7 +164,8 @@ void vTask_FRAM_to_SDCard(void)
 	ucAttemptCount = 5;
 
 	// Try 5 times or until the subslot ends, whichever comes first
-	while (ucAttemptCount-- > 0 && (ucTimeCheckForAlarms(SUBSLOT_WARNING_ALARM_BIT) == 0)) {
+	while (ucAttemptCount-- > 0 && (ucTimeCheckForAlarms(SUBSLOT_WARNING_ALARM_BIT) == 0))
+	{
 
 		// Assume success
 		ucErrorCode = ucErrorCodePriority = 0;
@@ -169,38 +174,75 @@ void vTask_FRAM_to_SDCard(void)
 		vSD_PowerOn();
 
 		// Try the initialization function a few times
-		for (uiCount = 0; uiCount < ucTimeout; uiCount++) {
+		for (uiCount = 0; uiCount < ucTimeout; uiCount++)
+		{
 			if (ucSD_Init() == SD_SUCCESS)
 				break;
 		}
-		if (uiCount == ucTimeout) {
+		if (uiCount == ucTimeout && ucAttemptCount == 0)
+		{
 			ucErrorCode = SRC_ID_SDCARD_INIT_FAIL;
 			ucErrorCodePriority = RPT_PRTY_SDCARD_INIT_FAIL;
-#if 1
+#if 0
 			vSERIAL_sout("SD Init Fail\r\n", 14);
 #endif
 		}
 
 		// Only proceed if initialization was successful
-		if (ucErrorCode == 0) {
+		if (ucErrorCode == 0)
+		{
 			// Write the block to the SD card
-			for (uiCount = 0; uiCount < ucTimeout; uiCount++) {
+			for (uiCount = 0; uiCount < ucTimeout; uiCount++)
+			{
 				if (SD_Write_Block(ucBlock, ulAddress) == SD_SUCCESS)
 					break;
 			}
-			if (uiCount == ucTimeout) {
+			if (uiCount == ucTimeout && ucAttemptCount == 0)
+			{
 				ucErrorCode = SRC_ID_SDCARD_WRITE_FAIL;
 				ucErrorCodePriority = RPT_PRTY_SDCARD_WRITE_FAIL;
-#if 1
+#if 0
 				vSERIAL_sout("SD write fail\r\n", 15);
 #endif
 			}
-			else{
-				//Power down the SD card and exit
-				vSD_PowerOff();
-				break;
-			}
+
+			for(uint z = 0; z < SD_CARD_BLOCKLEN; ++z)
+			    vSERIAL_HB8out(ucBlock[z]);
 		}
+
+        if (ucErrorCode == 0)
+        {
+            // Read the block to the SD card
+            for (uiCount = 0; uiCount < ucTimeout; uiCount++)
+            {
+                if (SD_Read_Block(ucVerifyBlock, ulAddress) == SD_SUCCESS)
+                    break;
+            }
+
+            if (uiCount == ucTimeout && ucAttemptCount == 0 )
+            {
+                ucErrorCode = SRC_ID_SDCARD_READ_FAIL;
+                ucErrorCodePriority = RPT_PRTY_SDCARD_READ_FAIL;
+#if 0
+                vSERIAL_sout("SD read fail\r\n", 15);
+#endif
+            }
+            else
+            {
+                for( i = 0; i < SD_CARD_BLOCKLEN; ++i )
+                {
+                    if( ucVerifyBlock[i] != ucBlock[i] )
+                    {
+                        verified = false;
+                        vSERIAL_sout("SD Verify Fail\r\n", 16);
+                        break;
+                    }
+                }
+
+                if( verified )
+                    break;
+            }
+        }
 
 		//Power down the SD card
 		vSD_PowerOff();
@@ -212,8 +254,8 @@ void vTask_FRAM_to_SDCard(void)
 
 
 	// If there was an error...
-	if (ucErrorCode != 0) {
-
+	if (ucErrorCode != 0)
+	{
 		// Build the report data element header
 		vComm_DE_BuildReportHdr(CP_ID, 2, ucMAIN_GetVersion());
 		ucMsgIndex = DE_IDX_RPT_PAYLOAD;
@@ -224,7 +266,8 @@ void vTask_FRAM_to_SDCard(void)
 		vReport_LogDataElement(ucErrorCodePriority);
 
 	}
-	else {
+	else
+	{
 
 		// Update the SD card address
 		vL2FRAM_IncrementSDCardBlockNum();
