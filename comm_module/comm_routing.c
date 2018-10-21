@@ -35,16 +35,16 @@ void vRouteClrAllUpdates(void);
 ////////////////////////////////////////////////////////////////////////////////
 uchar ucRoute_Init(uint uiAddress)
 {
-	int i;
-
 	//Save the address of this node
 	uiSelf = uiAddress;
 
 	//Clear values and edge list
 	uiNumEdges = 0;
-	for (i = 0; i < MAX_EDGES; i++)
-		S_edgeList[i].m_uiSrc = S_edgeList[i].m_uiDest = 0;
-
+	for (uint i = 0; i < MAX_EDGES; i++)
+	{
+	    S_edgeList[i].m_uiSrc = S_edgeList[i].m_uiDest = 0;
+	    S_edgeList[i].m_flags = F_NONE;
+	}
 	// Clear the arrays holding updates to the edge list
 	vRouteClrAllUpdates();
 
@@ -257,9 +257,7 @@ uchar ucRoute_NodeUnjoin(uint uiChild)
 		if (S_ptr->m_uiDest == uiChild)
 		{
 			// Add the unjoining node to the edge list and set the drop flag
-			S_RtUpdate.m_ucaEdges[S_RtUpdate.ucIndex].m_uiSrc = S_ptr->m_uiSrc;
-			S_RtUpdate.m_ucaEdges[S_RtUpdate.ucIndex].m_uiDest = S_ptr->m_uiDest;
-			S_RtUpdate.m_ucaFlags[S_RtUpdate.ucIndex] = F_DROP;
+		    S_ptr->m_flags = F_DROP;
 			if(S_RtUpdate.ucIndex<(MAX_UPDATES-1))
 				S_RtUpdate.ucIndex++;
 
