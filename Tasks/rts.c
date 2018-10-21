@@ -844,18 +844,21 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 #endif
 
 	/* IF NOT SENDING OM2'S THEN LEAVE */
- 	if (!ucL2FRAM_isSender()){
+ 	if (!ucL2FRAM_isSender())
 		return;
-	}
 
 	/* COUNT THE ACTIVE Child AND Parent SLOTS */
-	uiCountTotals = uiTask_countSOM2andROM2entrys();
+	uiCountTotals     = uiTask_countSOM2andROM2entrys();
 	ucActiveSOM2slots = (uchar) (uiCountTotals >> 8);
 
 	/* IF WE ALREADY HAVE AN ACTIVE SOM2 -- DONT DO RDC4 */
-	if (ucActiveSOM2slots != 0){
+	if (ucActiveSOM2slots != 0)
 		return;
-	}
+
+    // If we have lost our connection with the parent then we cannot support children
+    // Ideally we would be able to support children for a short period hoping to rejoin the network
+    // with all children, but we are seeing bugs
+    vTask_OrphanChildren();
 
 	/* GET THE NST TABLE NUMBER FROM THE FRAME NUMBER */
 	ucNST_tblNum = ucRTS_computeNSTfromFrameNum(lFrameNumToSched);
@@ -896,9 +899,6 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 
 	switch(S_Disc.m_ucMode){
 		case FULLDISCOVERY:
-			// If we have lost our connection with the parent then we cannot support children
-			vTask_OrphanChildren();
-
 			ucTask_SetField(ucTskIndex, TSK_FLAGS, (F_USE_NONEXACT_SLOT | F_USE_ANY_RAND | F_USE_NO_MAKE_OM2 |  F_USE_FULL_SLOT));
 			/* WE ARE A SPOKE THAT HAS NEVER ACQUIRED GROUP TIME -- DO A BLANKET SEARCH */
 			vRTS_schedule_all_slots(ucTskIndex, lFrameNumToSched);
@@ -926,9 +926,6 @@ static void vRTS_schedule_RTJ_slots(uchar ucTskIndex, //Tbl Idx of action to sch
 			break;
 
 		case BURSTDISCOVERY:
-			// If we have lost our connection with the parent then we cannot support children
-			vTask_OrphanChildren();
-
 			// If we are scheduling partial RTJ then modify the task flags to execute during middle subslot
 			ucTask_SetField(ucTskIndex, TSK_FLAGS, (F_USE_NONEXACT_SLOT | F_USE_ANY_RAND | F_USE_NO_MAKE_OM2 |  F_USE_MIDDLE_OF_SLOT));
 

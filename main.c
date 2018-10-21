@@ -40,7 +40,7 @@
  *
  ******************************************************************************/
 
-#define CP_VERSION 0x4E
+#define CP_VERSION 0x4F
 
 #define THIS_VERSION_SUBCODE	' '		//debug codes
 //#define THIS_VERSION_SUBCODE	'a'		//debug codes
@@ -95,7 +95,7 @@
 #include "scc.h"
 #include "sys.h"
 #include <ota.h> 			// Over the air reprogramming
-
+#include <string.h>
 #ifdef DEBUG_DISPATCH_TIME
 #include "t0.h"			//Timer T0 routines
 #endif
@@ -1342,10 +1342,8 @@ void vMain_SoilSensorTests(void){
 ///////////////////////////////////////////////////////////////////////////
 void vMain_Tests(void){
 
-
 	//Halt the dog
 	WDTCTL = WDTPW + WDTHOLD;
-
 
 //	vOTA_init();
 	//vOTA_UpdateOverSerial();
