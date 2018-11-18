@@ -11,6 +11,7 @@
 #ifndef COMM_H_INCLUDED
 #define COMM_H_INCLUDED
 
+#include <stdbool.h>
 #include "task.h"
 
 //! @name Data Element definitions
@@ -852,7 +853,7 @@ uchar ucMSG_getLastFilledEntryInOM2( //RET: 0=none, ##=idx of last entry in OM2
 //! \def F_DROP
 //! \brief Flags for updates to the routing module
 #define F_NONE    0x00
-#define F_DELETE  0x01
+#define F_PENDING 0x01
 #define F_JOIN    0x02
 #define F_DROP    0x04
 
@@ -860,7 +861,7 @@ typedef struct
 {
 	uint  m_uiSrc;
 	uint  m_uiDest;
-	uchar m_flags
+	uchar m_ucflags;
 } S_Edge;
 
 uchar ucRoute_Init(uint address);
@@ -871,7 +872,9 @@ uchar ucRoute_GetUpdateCountBytes(uchar ucAddOrDrop);
 void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail);
 void vRoute_SetUpdates(volatile uchar *ucaBuff);
 void vRouteClrFlaggedUpdates(void);
+void vRoute_clearPendingUpdates(bool);
 void vRoute_DisplayEdges(void);
+uint uiRoute_getNumEdges(void);
 
 // remove
 void vComm_zroMissedMsgCnt(void);

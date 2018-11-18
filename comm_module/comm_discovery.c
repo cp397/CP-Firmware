@@ -30,7 +30,7 @@
 
 /////////////////// defines //////////////////////
 #define MAX_LINKS_PER_SLOT		3
-
+#define xENABLE_ROUTING_UPDATE_IN_DISCOVERY // enables routing updates during discovery, NOT RECOMMENDED.
 
 
 ///////////////////   externs    /////////////////////////
@@ -39,7 +39,6 @@ extern uchar ucGLOB_myLevel; //senders level +1
 extern uint uiGLOB_TotalRTJ_attempts; //counts number of Request to Join attempts
 
 // routing data
-extern uint uiNumEdges;
 extern S_Edge S_edgeList[MAX_EDGES];
 
 // Freqency sync
@@ -146,12 +145,12 @@ void vCommGetDiscMode(T_Discovery *S_Disc)
 ///////////////////////////////////////////////////////////////////////////////
 void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
 {
-	uchar ucEdgeCount;
-	uchar ucMsgIndex;
-	uchar ucPacketSize;
+    enum
+    {
+        noEdges = 0
+    };
 
-	// Start the index at 0;
-	ucMsgIndex = 0;
+	uchar ucPacketSize;
 
 	/* STUFF MSG TYPE */
 	ucaMSG_BUFF[MSG_IDX_ID] = MSG_ID_REQUEST_TO_JOIN;
@@ -169,30 +168,48 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
 	// Stuff the random seed to schedule future communication
 	vMISC_copyUlongIntoBytes(ulRandomSeed, (uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
 
-	ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = uiNumEdges;
+#ifdef ENABLE_ROUTING_UPDATE_IN_DISCOVERY
+        uchar ucEdgeCount;
+        uchar ucMsgIndex = 0;
+        uint uiNumEdges = 0;
 
-	ucMsgIndex = MSG_IDX_EDGE_DISC;
+	    // Updating the edge list here was causing network failures.
+	    // Establishing the network is top priority, update routing in
+	    // subsequent slots
+        ucMsgIndex = MSG_IDX_EDGE_DISC;
 
-	if (uiNumEdges < (MAX_MSG_SIZE - 0x12))
-	{
-		// load the routing table
-		for (ucEdgeCount = 0; ucEdgeCount < uiNumEdges; ucEdgeCount++)
-		{
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiSrc >> 8);
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiSrc;
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiDest >> 8);
-			ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiDest;
-		}
+        // This is not a great solution,
+        uiNumEdges = uiRoute_getNumEdges();
 
-		// stuff message size
-		ucaMSG_BUFF[MSG_IDX_LEN] = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
-	}
+        if (uiNumEdges < (MAX_MSG_SIZE - 0x12))
+            uiNumEdges = MAX_MSG_SIZE / 4;
 
-	// Set the packet size
-	 ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+        ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = uiNumEdges;
 
-	/* COMPUTE THE CRC */
-	ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucaMSG_BUFF, ucPacketSize) ; //lint !e534 //compute the CRC
+        if (uiNumEdges < (MAX_MSG_SIZE - 0x12))
+        {
+            // load the routing table
+            for (ucEdgeCount = 0; ucEdgeCount < uiNumEdges; ucEdgeCount++)
+            {
+                ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiSrc >> 8);
+                ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiSrc;
+                ucaMSG_BUFF[ucMsgIndex++] = (uchar) (S_edgeList[ucEdgeCount].m_uiDest >> 8);
+                ucaMSG_BUFF[ucMsgIndex++] = (uchar) S_edgeList[ucEdgeCount].m_uiDest;
+            }
+
+            // stuff message size
+            ucaMSG_BUFF[MSG_IDX_LEN] = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
+        }
+
+         ucPacketSize = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
+#else
+         ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = noEdges;
+         ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
+#endif
+
+    // stuff message length
+    ucaMSG_BUFF[MSG_IDX_LEN] = ucPacketSize;
+    ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucaMSG_BUFF, ucPacketSize) ; //lint !e534 //compute the CRC
 
 	//Show the message
 #if 0
@@ -282,13 +299,17 @@ static void vComm_Msg_buildBeacon(long lSyncTimeSec)
 ///////////////////////////////////////////////////////////////////////////////
 static signed char cComm_WaitFor_RequesttoJoin(void)
 {
+    enum
+    {
+        integrityBits = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
+    };
+
+    uchar ucTotalEdges = 0; // Number of child nodes joining network
+    S_Edge S_Edges[10];
 	uchar ucIntegrityRetVal;
 	uint uiOtherGuysSN;
 	ulong uslRandNum;
-	uchar ucEdgeCount;
-	uchar ucTotalEdges;
 	uchar ucMsgIndex;
-	S_Edge S_Edges[10];
 	uchar ucFoundTskIndex;
 	signed char cRetVal;
 
@@ -298,12 +319,13 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 	vTime_SetLinkSlotAlarm(ON);
 
 	//Wait for replies
-	while (TRUE) {
+	while (TRUE)
+	{
 		// Start the receiver and wait for RTJ
 		vADF7020_TXRXSwitch(RADIO_RX_MODE);
 
-		if (ucComm_waitForMsgOrTimeout(NO_RSSI) == 0) {
-
+		if (ucComm_waitForMsgOrTimeout(NO_RSSI) == 0)
+		{
 			// Time is up, exit
 			break;
 		}
@@ -311,16 +333,13 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 		{
 			//Check the message integrity
 			//RET: Bit Err Mask, 0 if OK
-			ucIntegrityRetVal = ucComm_chkMsgIntegrity(
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
-					MSG_ID_REQUEST_TO_JOIN, //msg type
+			ucIntegrityRetVal = ucComm_chkMsgIntegrity(integrityBits, integrityBits, MSG_ID_REQUEST_TO_JOIN,
 					0, //src SN
 					uiL2FRAM_getSnumLo16AsUint() //Dst SN
 					);
 			// If the message is good
-			if (ucIntegrityRetVal == 0) {
-
+			if (ucIntegrityRetVal == 0)
+			{
 #if 0
 				// Debug - Show the RTJ message
 				uint8 ucCounter;
@@ -334,12 +353,14 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 #endif
 
 				//Save message data
-				uiOtherGuysSN = uiMISC_buildUintFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_ADDR_HI], NO_NOINT);
-
-				uslRandNum = ulMISC_buildUlongFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
+				uiOtherGuysSN = uiMISC_buildUintFromBytes((uchar *)  &ucaMSG_BUFF[MSG_IDX_ADDR_HI],     NO_NOINT);
+				uslRandNum    = ulMISC_buildUlongFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
 
 				/* STASH THE LINKUP SN */
 				uiaLinkSN[ucLinkSNidx++] = uiOtherGuysSN;
+
+#ifdef ENABLE_ROUTING_UPDATE_IN_DISCOVERY
+			    uchar ucEdgeCount;
 
 				ucTotalEdges = ucaMSG_BUFF[MSG_IDX_NUM_EDGES];
 
@@ -358,16 +379,17 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 					S_Edges[ucEdgeCount].m_uiDest = (uint) (ucaMSG_BUFF[ucMsgIndex++] << 8);
 					S_Edges[ucEdgeCount].m_uiDest |= (uint) ucaMSG_BUFF[ucMsgIndex++];
 				}
+#endif
 
-				ucRoute_NodeJoin(0, uiOtherGuysSN, S_Edges, (int) ucTotalEdges);
+                ucRoute_NodeJoin(0, uiOtherGuysSN, S_Edges, (int) ucTotalEdges);
 
 				// If a RTJ is received from a node that is already in the task list then it must have
 				// dropped the link.  Therefore, we delete the task and initiate a new link with the node.
 				// This assumes that there are no duplicate node IDs in the network
 				ucFoundTskIndex = ucTask_SearchforLink(uiOtherGuysSN);
 
-				if (ucFoundTskIndex != INVALID_TASKINDEX) {
-
+				if (ucFoundTskIndex != INVALID_TASKINDEX)
+				{
 					// Remove the node from the link block table
 					ucLNKBLK_RemoveNode(uiOtherGuysSN);
 
@@ -377,23 +399,21 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 					// Destroy this task
 					ucTask_DestroyTask(ucFoundTskIndex);
 
-				// Build the report data element stating that the link has been broken
-				vComm_DE_BuildReportHdr(CP_ID, 4, ucMAIN_GetVersion());
-				ucMsgIndex = DE_IDX_RPT_PAYLOAD;
+                    // Build the report data element stating that the link has been broken
+                    vComm_DE_BuildReportHdr(CP_ID, 4, ucMAIN_GetVersion());
+                    ucMsgIndex = DE_IDX_RPT_PAYLOAD;
 
-				ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_LINK_BROKEN;
-				ucaMSG_BUFF[ucMsgIndex++] = 2; // data length
-				ucaMSG_BUFF[ucMsgIndex++] = (uchar) (uiOtherGuysSN >> 8);
-				ucaMSG_BUFF[ucMsgIndex++] = (uchar) uiOtherGuysSN;
+                    ucaMSG_BUFF[ucMsgIndex++] = SRC_ID_LINK_BROKEN;
+                    ucaMSG_BUFF[ucMsgIndex++] = 2; // data length
+                    ucaMSG_BUFF[ucMsgIndex++] = (uchar) (uiOtherGuysSN >> 8);
+                    ucaMSG_BUFF[ucMsgIndex++] = (uchar) uiOtherGuysSN;
 
-				// Store DE
-				vReport_LogDataElement(RPT_PRTY_LINK_BROKEN);
+                    // Store DE
+                    vReport_LogDataElement(RPT_PRTY_LINK_BROKEN);
 				}
 
 				// Create the operational message task here
-				ucTask_CreateOMTask(uiOtherGuysSN, //SN
-						uslRandNum, //Random seed
-						PARENT);
+				ucTask_CreateOMTask(uiOtherGuysSN, uslRandNum, PARENT);
 
 #if 1
 				/* REPORT TO CONSOLE */

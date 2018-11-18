@@ -14,24 +14,25 @@
 //! \addtogroup Communications
 //! @{
 
-#include <msp430x54x.h>		//processor reg description */
-#include <time_wisard.h>					//Time routines
-#include "task.h"					//Task management module
-#include "comm.h"    			//event MSG module
-#include "buz.h"					//Buzzer
-#include "adf7020.h"			//radio driver
-#include "mem_mod.h"			//memory module
-#include "misc.h"					//homeless functions
-#include "crc.h"					//CRC calculation module
-#include "gid.h"					//group ID routines
-#include "serial.h"				//serial IO port stuff
-#include "rand.h"					//random number generator
-#include "rts.h" 					//scheduling functions
-#include "lnkblk.h"				//Link block routines
-#include "report.h"				//Reporting
-#include "delay.h"				// Delay module
-#include "main.h"				// For getting software version
-#include "ota.h"					// Handlers for program code
+#include <msp430x54x.h>	    //processor reg description */
+#include <time_wisard.h>    //Time routines
+#include "task.h"           //Task management module
+#include "comm.h"           //event MSG module
+#include "buz.h"            //Buzzer
+#include "adf7020.h"        //radio driver
+#include "mem_mod.h"        //memory module
+#include "misc.h"           //homeless functions
+#include "crc.h"            //CRC calculation module
+#include "gid.h"            //group ID routines
+#include "serial.h"         //serial IO port stuff
+#include "rand.h"           //random number generator
+#include "rts.h"            //scheduling functions
+#include "lnkblk.h"         //Link block routines
+#include "report.h"         //Reporting
+#include "delay.h"          // Delay module
+#include "main.h"           // For getting software version
+#include "ota.h"            // Handlers for program code
+
 ///////////////////   externs    /////////////////////////
 extern volatile uint8 ucaMSG_BUFF[MAX_RESERVED_MSG_SIZE];
 extern uchar g_ucaCurrentTskIndex;
@@ -75,8 +76,6 @@ ulong g_ulLastCommTime = 0;
 uchar ucComm_WaitForAck(uint uiMsgNumber);
 void vComm_SendAck(uint uiMsgNumber);
 
-//TODO remove
-long ulRand = 0;
 
 /////////////////////////////////////////////////////////////////////////////
 //!
@@ -598,12 +597,12 @@ uchar ucComm_ParseMsg(void)
 			}
 
 			// Get the command parameters from the message
-			for (ucByteCount = 0; ucByteCount < S_CommandData.m_ucCmdLength; ucByteCount++) {
+			for (ucByteCount = 0; ucByteCount < S_CommandData.m_ucCmdLength; ucByteCount++)
 				S_CommandData.m_ucCmdParam[ucByteCount] = ucaMSG_BUFF[ucCount++];
-			}
 
 			// If the command has expired then report it.  Otherwise, go handle the command.
-			if (lExpTime < lTIME_getSysTimeAsLong()) {
+			if (lExpTime < lTIME_getSysTimeAsLong())
+			{
 #if 0
 				vSERIAL_sout("Cmd Expired\r\n", 13);
 				vSERIAL_sout("Cmd Time: ", 10);
@@ -829,10 +828,13 @@ void vComm_SendLRQ(uchar ucLinkByte)
 		// Wait for an ack
 		vADF7020_TXRXSwitch(RADIO_RX_MODE);
 		if (!ucComm_WaitForAck(1))
+		{
+		    vRoute_clearPendingUpdates(FALSE);
 			return;
+		}
 
 		// Since we have received an ACK we can remove the flagged updates
-		vRouteClrFlaggedUpdates();
+		vRoute_clearPendingUpdates(TRUE);
 
 		// Get the total number of routing updates
 		ucUpdateCount = ucRoute_GetUpdateCountBytes(F_JOIN | F_DROP);
@@ -1368,6 +1370,11 @@ void vComm_Parent(void)
 /////////////////////////////////////////////////////////////////////////////
 void vComm_Child(void)
 {
+    enum
+    {
+        checkBits = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN + CHKBIT_SRC_SN,
+        reportBits = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN + CHKBIT_SRC_SN
+    };
 	uchar ucParseRet;
 	uchar ucLinkByte;
 	uint uiOtherGuysSN;
@@ -1432,22 +1439,15 @@ void vComm_Child(void)
 	ucLnkRqstSuccess = FALSE;
 
 	// Loop and wait for commands until time out
-	while (ucTimeCheckForAlarms(SUBSLOT_ALARMS) == 0) {
-		if (ucComm_waitForMsgOrTimeout(NO_RSSI)) {
+	while (ucTimeCheckForAlarms(SUBSLOT_ALARMS) == 0)
+	{
+		if (ucComm_waitForMsgOrTimeout(NO_RSSI))
+		{
 			/* GOT A MSG -- CHK FOR: CRC, MSGTYPE, DEST_SN */
-			if (!(ucComm_chkMsgIntegrity( //RET: Bit Err Mask, 0 if OK
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN + CHKBIT_SRC_SN, //chk flags
-					CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN + CHKBIT_SRC_SN, //report flags
-					MSG_ID_OPERATIONAL, //msg type
-					uiOtherGuysSN, //src SN
-					uiMySN //Dst SN
-					))) {
-
+			if (!ucComm_chkMsgIntegrity(checkBits, reportBits, MSG_ID_OPERATIONAL, uiOtherGuysSN, uiMySN))
+			{
 				// The link request was received
 				ucLnkRqstSuccess = TRUE;
-
-				// Clear the update table... This should be placed elsewhere
-				vRouteClrFlaggedUpdates();
 
 				// Store a local copy of the message number for the ack
 				uiMsgNumber = ((ucaMSG_BUFF[MSG_IDX_NUM_HI] << 8) | ucaMSG_BUFF[MSG_IDX_NUM_LO]);

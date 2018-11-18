@@ -140,20 +140,16 @@ void vReport_LogDataElement(uchar ucPriority)
 
 	// Loop through the message buffer and write contents to the RAM queue
 	for (ucIndex = 0; ucIndex < ucDE_Length; ucIndex++)
-	{
 		S_RAM_Queue.m_ucaQueue[S_RAM_Queue.m_uiQueueTail + ucIndex] = ucaMSG_BUFF[ucIndex];
-	}
 
 	// Increment the tail to point to the next free location
 	S_RAM_Queue.m_uiQueueTail = S_RAM_Queue.m_uiQueueTail + MAX_DE_LEN;
 
 	// Update the DE count
-	if (S_RAM_Queue.m_uiQueueTail >= S_RAM_Queue.m_uiQueueHead){
+	if (S_RAM_Queue.m_uiQueueTail >= S_RAM_Queue.m_uiQueueHead)
 		S_RAM_Queue.m_uiQueueCount = (S_RAM_Queue.m_uiQueueTail - S_RAM_Queue.m_uiQueueHead) / MAX_DE_LEN;
-	}
-	else {
+	else
 		S_RAM_Queue.m_uiQueueCount = ((QUEUE_SIZE - S_RAM_Queue.m_uiQueueHead) + S_RAM_Queue.m_uiQueueTail) / MAX_DE_LEN;
-	}
 
 	//If the RAM queue is too close to the max then reset to the start
 	if (S_RAM_Queue.m_uiQueueTail == QUEUE_SIZE)
