@@ -212,6 +212,11 @@ uchar ucComm_incLnkBrkCntAndChkForDeadOM2(void)
 
 	// Remove the dropped node and all its descendants from the edge list
 	ucRoute_NodeUnjoin(uiSN);
+    if (ucL2FRAM_isHub())
+    {
+        ucRoute_NodeUnjoin(uiSN);
+        ucRoute_RemoveEdge(uiL2FRAM_getSnumLo16AsUint(), uiSN);
+    }
 
 	// Destroy this task
 	ucTask_DestroyTask(g_ucaCurrentTskIndex);
@@ -908,6 +913,10 @@ static uchar ucComm_WaitFor_LRQ(void)
 
 			// Update the edge list (routing data).
 			vRoute_SetUpdates(&ucaMSG_BUFF[(uchar) (MSG_IDX_LRQ + 1)]);
+
+            // If this is the hub then clear edge status since it is not reported up the chain
+			if(ucL2FRAM_isHub())
+			    vRoute_clearPendingUpdates(true);
 
 			// Stash the link request if allowed
 			ucLNKBLK_ReadFlags(uiOtherGuysSN, &ucLnkFlags);
@@ -1622,45 +1631,75 @@ void vCommTest(void)
 	S_edgeListTemp[7].m_uiSrc = 0x776;
 	S_edgeListTemp[7].m_uiDest = 0x777;
 
-	S_edgeListTemp[8].m_uiSrc = 0x776;
-	S_edgeListTemp[8].m_uiDest = 0x780;
+//	S_edgeListTemp[8].m_uiSrc = 0x776;
+//	S_edgeListTemp[8].m_uiDest = 0x780;
+//
+//	S_edgeListTemp[9].m_uiSrc = 0x776;
+//	S_edgeListTemp[9].m_uiDest = 0x781;
+//
+//	S_edgeListTemp[10].m_uiSrc = 0x776;
+//	S_edgeListTemp[10].m_uiDest = 0x782;
+//
+//	S_edgeListTemp[11].m_uiSrc = 0x776;
+//	S_edgeListTemp[11].m_uiDest = 0x783;
+//
+//	S_edgeListTemp[12].m_uiSrc = 0x776;
+//	S_edgeListTemp[12].m_uiDest = 0x784;
+//
+//	S_edgeListTemp[13].m_uiSrc = 0x776;
+//	S_edgeListTemp[13].m_uiDest = 0x785;
+//
+//	S_edgeListTemp[14].m_uiSrc = 0x776;
+//	S_edgeListTemp[14].m_uiDest = 0x786;
+//
+//	S_edgeListTemp[15].m_uiSrc = 0x776;
+//	S_edgeListTemp[15].m_uiDest = 0x787;
+//
+//	S_edgeListTemp[16].m_uiSrc = 0x776;
+//	S_edgeListTemp[16].m_uiDest = 0x788;
+//
+//	S_edgeListTemp[17].m_uiSrc = 0x776;
+//	S_edgeListTemp[17].m_uiDest = 0x789;
+//
+//	S_edgeListTemp[18].m_uiSrc = 0x776;
+//	S_edgeListTemp[18].m_uiDest = 0x78A;
+//
+//	S_edgeListTemp[19].m_uiSrc = 0x776;
+//	S_edgeListTemp[19].m_uiDest = 0x78B;
 
-	S_edgeListTemp[9].m_uiSrc = 0x776;
-	S_edgeListTemp[9].m_uiDest = 0x781;
 
-	S_edgeListTemp[10].m_uiSrc = 0x776;
-	S_edgeListTemp[10].m_uiDest = 0x782;
+	vSERIAL_sout("Loading list...\r\n", 16);
+	ucRoute_NodeJoin(0, 0x770, S_edgeListTemp, 8);
 
-	S_edgeListTemp[11].m_uiSrc = 0x776;
-	S_edgeListTemp[11].m_uiDest = 0x783;
-
-	S_edgeListTemp[12].m_uiSrc = 0x776;
-	S_edgeListTemp[12].m_uiDest = 0x784;
-
-	S_edgeListTemp[13].m_uiSrc = 0x776;
-	S_edgeListTemp[13].m_uiDest = 0x785;
-
-	S_edgeListTemp[14].m_uiSrc = 0x776;
-	S_edgeListTemp[14].m_uiDest = 0x786;
-
-	S_edgeListTemp[15].m_uiSrc = 0x776;
-	S_edgeListTemp[15].m_uiDest = 0x787;
-
-	S_edgeListTemp[16].m_uiSrc = 0x776;
-	S_edgeListTemp[16].m_uiDest = 0x788;
-
-	S_edgeListTemp[17].m_uiSrc = 0x776;
-	S_edgeListTemp[17].m_uiDest = 0x789;
-
-	S_edgeListTemp[18].m_uiSrc = 0x776;
-	S_edgeListTemp[18].m_uiDest = 0x78A;
-
-	S_edgeListTemp[19].m_uiSrc = 0x776;
-	S_edgeListTemp[19].m_uiDest = 0x78B;
-
-	ucRoute_NodeJoin(0, 0x770, S_edgeListTemp, 15);
+	vSERIAL_sout("Nxt to 770: ", 12);
+	vSERIAL_HB16out(uiRoute_GetNextHop(0x770));
+	vSERIAL_crlf();
 
 	vRoute_DisplayEdges();
+
+    vSERIAL_sout("Get updates...\r\n", 16);
+    vRoute_GetUpdates(&ucaMSG_BUFF[(uchar) (MSG_IDX_LRQ + 1)], 6);
+    vRoute_DisplayEdges();
+
+    vSERIAL_sout("Clr updates...\r\n", 16);
+    vRoute_clearPendingUpdates(TRUE);
+    vRoute_DisplayEdges();
+
+	ucRoute_NodeUnjoin(0x770);
+
+	vSERIAL_sout("Nxt to 770: ", 12);
+	vSERIAL_HB16out(uiRoute_GetNextHop(0x770));
+	vSERIAL_crlf();
+
+
+    vSERIAL_sout("Get updates...\r\n", 16);
+    vRoute_GetUpdates(ucaMSG_BUFF, 70);
+    vRoute_DisplayEdges();
+
+    vSERIAL_sout("Clr updates...\r\n", 16);
+    vRoute_clearPendingUpdates(TRUE);
+    vRoute_DisplayEdges();
+
 
 //	vComm_SendLRQ(0x12);
 //

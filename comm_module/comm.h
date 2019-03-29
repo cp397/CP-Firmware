@@ -876,6 +876,10 @@ void vRoute_clearPendingUpdates(bool);
 void vRoute_DisplayEdges(void);
 uint uiRoute_getNumEdges(void);
 
+uchar ucRoute_RemoveEdge(uint uiSrc, uint uiDest);
+    // This is only to be called by the hub when a node is dropped.
+    // Or called internally by the routing module.
+
 // remove
 void vComm_zroMissedMsgCnt(void);
 //! @}

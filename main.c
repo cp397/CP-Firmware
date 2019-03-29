@@ -804,6 +804,12 @@ void main(void){
 		// Feed the dog
 		WDTCTL = WDTPW + WDTSSEL_1 + WDTCNTCL + WDTIS_3;
 
+//		vCommTest();
+
+	    vSERIAL_sout("Nxt to 684: ", 12);
+	    vSERIAL_HB16out(uiRoute_GetNextHop(0x684));
+        vRoute_DisplayEdges();
+
 		if(ucGLOB_diagFlagByte2.diagFlagByte2_STRUCT.DIAG_mode_main_bit)
 		{
 			//Halt the dog while the system initializes
@@ -841,7 +847,7 @@ void main(void){
 			P7OUT ^= BIT6;
 
 			// Dispatch to task
-			vTask_Dispatch(ucGLOB_lastAwakeNSTtblNum, ucGLOB_lastAwakeSlot);
+ 			vTask_Dispatch(ucGLOB_lastAwakeNSTtblNum, ucGLOB_lastAwakeSlot);
 
 			// Check to see if the SPs have data
 			vRTS_CheckSPDataPending();

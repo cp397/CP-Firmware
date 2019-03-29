@@ -304,19 +304,21 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
         integrityBits = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
     };
 
-    uchar ucTotalEdges = 0; // Number of child nodes joining network
     S_Edge S_Edges[10];
-	uchar ucIntegrityRetVal;
-	uint uiOtherGuysSN;
+    uchar ucTotalEdges = 0; // Number of child nodes joining network
+    uchar ucIntegrityRetVal;
+    uchar ucMsgIndex;
+    uchar ucFoundTskIndex;
+	uint  uiOtherGuysSN;
+	uint  uiMySN;
 	ulong uslRandNum;
-	uchar ucMsgIndex;
-	uchar ucFoundTskIndex;
 	signed char cRetVal;
 
 	// Assume timeout
 	cRetVal = -1;
 
 	vTime_SetLinkSlotAlarm(ON);
+	uiMySN = uiL2FRAM_getSnumLo16AsUint();
 
 	//Wait for replies
 	while (TRUE)
@@ -333,10 +335,7 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 		{
 			//Check the message integrity
 			//RET: Bit Err Mask, 0 if OK
-			ucIntegrityRetVal = ucComm_chkMsgIntegrity(integrityBits, integrityBits, MSG_ID_REQUEST_TO_JOIN,
-					0, //src SN
-					uiL2FRAM_getSnumLo16AsUint() //Dst SN
-					);
+			ucIntegrityRetVal = ucComm_chkMsgIntegrity(integrityBits, integrityBits, MSG_ID_REQUEST_TO_JOIN, 0, uiMySN);
 			// If the message is good
 			if (ucIntegrityRetVal == 0)
 			{
@@ -388,7 +387,7 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 				// This assumes that there are no duplicate node IDs in the network
 				ucFoundTskIndex = ucTask_SearchforLink(uiOtherGuysSN);
 
-				if (ucFoundTskIndex != INVALID_TASKINDEX)
+				if (ucFoundTskIndex != INVALID_TASKINDEX || uiOtherGuysSN == uiMySN)
 				{
 					// Remove the node from the link block table
 					ucLNKBLK_RemoveNode(uiOtherGuysSN);

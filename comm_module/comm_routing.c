@@ -11,7 +11,7 @@
 
 //! \var uiNumEdges
 //! \brief The number of edges in the edge list.  THis includes all descendants
-static uint uiNumEdges;
+static uint uiNumEdges = 0;
 //! \struct S_nextEdge
 //! \brief A structure pointer to indices in the edge list
 static S_Edge *S_nextEdge;
@@ -39,7 +39,10 @@ uchar ucRoute_Init(uint uiAddress)
     //Clear values and edge list
     uiNumEdges = 0;
     for (uint i = 0; i < MAX_EDGES; i++)
+    {
         S_edgeList[i].m_uiSrc = S_edgeList[i].m_uiDest = 0;
+        S_edgeList[i].m_ucflags = F_NONE;
+    }
 
     //Initialize non-zero values
     S_nextEdge = S_edgeList;
@@ -55,10 +58,18 @@ uchar ucRoute_Init(uint uiAddress)
 //! \param uiSrc, uiDest; source and destination node addresses
 //! \return 0 for success, else error code
 ////////////////////////////////////////////////////////////////////////////////
-uchar ucRoute_AddEdge(uint uiSrc, uint uiDest)
+static uchar ucAddEdge(uint uiSrc, uint uiDest)
 {
+    int i;
+    S_Edge *S_ptr;
     if (uiNumEdges >= MAX_EDGES)
         return ROUTE_ERROR_TABLE_FULL;
+
+    for (i = 0, S_ptr = S_edgeList; i < uiNumEdges; i++, S_ptr++)
+    {
+        if (S_ptr->m_uiSrc == uiSrc && S_ptr->m_uiDest == uiDest)
+            return 0;
+    }
 
     //Save the edge nodes and increment the pointer.  Also add the edges to the update list.
     S_nextEdge->m_uiSrc   = uiSrc;
@@ -111,9 +122,7 @@ uchar ucRoute_RemoveEdge(uint uiSrc, uint uiDest)
             S_nextEdge--;
             S_edgeList[uiNumEdges].m_uiSrc = 0;
             S_edgeList[uiNumEdges].m_uiDest = 0;
-
-            //We found the edge so exit the loop
-            break;
+            S_edgeList[uiNumEdges].m_ucflags = F_NONE;
         }
     }
 
@@ -147,7 +156,12 @@ uint uiRoute_GetNextHop(uint uiDest)
         {
             // If the child is a direct child of this node then return the destination address
             if(S_ptr->m_uiSrc == uiSelf)
-                return uiDest;
+            {
+                if(S_ptr->m_ucflags & F_DROP)
+                    return 0;
+                else
+                    return uiDest;
+            }
 
             //If the src is not the self then save the parent (source) of the edge
             uiSrc = S_ptr->m_uiSrc;
@@ -168,11 +182,14 @@ uint uiRoute_GetNextHop(uint uiDest)
         for (j = 0, S_ptr2 = S_edgeList; j < uiNumEdges; j++, S_ptr2++)
         {
             //If the current edge leads to src then src is a child of this node (and therefore it is the next hop)
-            if (S_ptr2->m_uiDest == uiSrc && S_ptr2->m_uiSrc == uiSelf)
+            if (    S_ptr2->m_uiDest == uiSrc
+                 && S_ptr2->m_uiSrc  == uiSelf)
             {
-                return uiSrc;
+                if(S_ptr->m_ucflags & F_DROP)
+                    return 0;
+                else
+                    return uiSrc;
             }
-
             //Otherwise continue backtracking from src
             else if (S_ptr2->m_uiDest == uiSrc)
             {
@@ -207,14 +224,14 @@ uchar ucRoute_NodeJoin(uint uiParent, uint uiChild, S_Edge* S_edges, int iNumEdg
     //Add all of the edges in the subtree of this node
     for (i = 0, S_ptr = S_edges; i < iNumEdges; i++, S_ptr++)
     {
-        ucReturnValue = ucRoute_AddEdge(S_ptr->m_uiSrc, S_ptr->m_uiDest);
+        ucReturnValue = ucAddEdge(S_ptr->m_uiSrc, S_ptr->m_uiDest);
         if (ucReturnValue != 0)
             return ucReturnValue;
     }
 
     //Add the new edge from the 'mount point' node to the new node
-    if(uiParent == 0) return ucRoute_AddEdge(uiSelf, uiChild);      //The node is joining as a direct child
-    else return ucRoute_AddEdge(uiParent, uiChild);               //The node is joining as a non-child descendant
+    if(uiParent == 0) return ucAddEdge(uiSelf, uiChild);      //The node is joining as a direct child
+    else return ucAddEdge(uiParent, uiChild);               //The node is joining as a non-child descendant
 }
 
 
@@ -296,7 +313,7 @@ uchar ucRoute_GetUpdateCount(uchar ucAddOrDrop)
     uchar ucCount = 0;
     S_Edge *S_ptr = S_edgeList;
 
-    for (uchar ucIndex = 0; ucIndex < uiNumEdges; ucIndex++)
+    for (uchar ucIndex = 0; ucIndex < uiNumEdges; ucIndex++, S_ptr++)
         if (S_ptr->m_ucflags == ucAddOrDrop)
             ucCount++;
 
@@ -370,7 +387,7 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 
         S_ptr = S_edgeList;
         // Fill drop node addresses
-        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 2; ++i, ucSpaceAvail -= 2, S_ptr++)
+        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 2; ++i, S_ptr++)
         {
             // For drops we only load the source node.  No point in transmitting the destination
             if (S_ptr->m_ucflags & F_DROP)
@@ -378,6 +395,8 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
                 // Add the addresses to the message
                 *ucaBuff++ = (uchar) (S_ptr->m_uiSrc >> 8);
                 *ucaBuff++ = (uchar) S_ptr->m_uiSrc;
+                S_ptr->m_ucflags |= F_PENDING;
+                ucSpaceAvail -= 2;
             }
         }
     }
@@ -396,7 +415,7 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 
         S_ptr = S_edgeList;
         // Fill join node addresses
-        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 4; ++i, ucSpaceAvail -= 4, S_ptr++)
+        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 4; ++i, S_ptr++)
         {
             if (S_ptr->m_ucflags & F_JOIN)
             {
@@ -405,6 +424,8 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
                 *ucaBuff++ = (uchar) S_ptr->m_uiSrc;
                 *ucaBuff++ = (uchar) (S_ptr->m_uiDest >> 8);
                 *ucaBuff++ = (uchar) S_ptr->m_uiDest;
+                S_ptr->m_ucflags |= F_PENDING;
+                ucSpaceAvail -= 4;
             }
         }
     }
@@ -424,27 +445,41 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 void vRoute_clearPendingUpdates(bool success)
 {
     // IMPORTANT: Only increment edge pointer and index when not removing an edge because
-    //            the ucRoute_RemoveEdge function decrements edge count and shifts the list
+    //            the ucRemoveEdge function decrements edge count and shifts the list
 
     S_Edge* S_ptr = S_edgeList;
 
     for (uint i = 0; i < uiNumEdges; )
     {
-        if (!success)
+        // If not pending then move to the next edge
+        if (S_ptr->m_ucflags & F_PENDING)
         {
             S_ptr->m_ucflags &= ~F_PENDING;
-            continue;
-        }
 
-        if (S_ptr->m_ucflags & F_DROP)
-        {
-            ucRoute_RemoveEdge(S_ptr->m_uiSrc, S_ptr->m_uiDest);
+            // If the push wasn't successful then don't clear F_DROP or F_JOIN
+            if (!success)
+                continue;
+
+            if (S_ptr->m_ucflags & F_DROP)
+            {
+                ucRoute_RemoveEdge(S_ptr->m_uiSrc, S_ptr->m_uiDest);
+            }
+            else if (S_ptr->m_ucflags & F_JOIN)
+            {
+                S_ptr->m_ucflags = F_NONE;
+                S_ptr++;
+                i++;
+            }
+            else
+            {
+                S_ptr++;
+                i++;
+            }
         }
-        else if (S_ptr->m_ucflags & F_JOIN)
+        else
         {
             S_ptr++;
             i++;
-            S_ptr->m_ucflags = F_NONE;
         }
     }
 }
@@ -488,7 +523,7 @@ void vRoute_SetUpdates(volatile uchar *ucaBuff)
         S_EdgeLocal[ucCount].m_uiDest = (uint) (*ucaBuff++<<8);
         S_EdgeLocal[ucCount].m_uiDest |= (uint) (*ucaBuff++);
 
-        ucRoute_AddEdge(S_EdgeLocal[ucCount].m_uiSrc, S_EdgeLocal[ucCount].m_uiDest);
+        ucAddEdge(S_EdgeLocal[ucCount].m_uiSrc, S_EdgeLocal[ucCount].m_uiDest);
     }
 }
 
@@ -496,13 +531,23 @@ void vRoute_DisplayEdges(void)
 {
     uint uiEdgeCount;
 
-    vSERIAL_sout("SOURCE    DESTINATION", 21);
+    vSERIAL_sout("SOURCE    DESTINATION   STATUS", 30);
     vSERIAL_crlf();
     for(uiEdgeCount = 0; uiEdgeCount < uiNumEdges; uiEdgeCount++)
     {
         vSERIAL_HB16out(S_edgeList[uiEdgeCount].m_uiSrc);
         vSERIAL_sout("      ", 6);
         vSERIAL_HB16out(S_edgeList[uiEdgeCount].m_uiDest);
+        vSERIAL_sout("          ", 10);
+        if( S_edgeList[uiEdgeCount].m_ucflags == F_NONE)
+            vSERIAL_sout("active ", 7);
+        if( S_edgeList[uiEdgeCount].m_ucflags & F_JOIN)
+            vSERIAL_sout("joined ", 7);
+        if( S_edgeList[uiEdgeCount].m_ucflags & F_DROP)
+            vSERIAL_sout("droppd ", 7);
+        if( S_edgeList[uiEdgeCount].m_ucflags & F_PENDING)
+            vSERIAL_sout("pendng ", 7);
+
         vSERIAL_crlf();
     }
 

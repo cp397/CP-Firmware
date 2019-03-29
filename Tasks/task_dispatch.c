@@ -205,9 +205,6 @@ void vTask_FRAM_to_SDCard(void)
 				vSERIAL_sout("SD write fail\r\n", 15);
 #endif
 			}
-
-			for(uint z = 0; z < SD_CARD_BLOCKLEN; ++z)
-			    vSERIAL_HB8out(ucBlock[z]);
 		}
 
         if (ucErrorCode == 0)
