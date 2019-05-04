@@ -41,6 +41,7 @@
  ******************************************************************************/
 
 #define CP_VERSION 0x4F
+#define BUILD      "032820190002"
 
 #define THIS_VERSION_SUBCODE	' '		//debug codes
 //#define THIS_VERSION_SUBCODE	'a'		//debug codes
@@ -805,9 +806,6 @@ void main(void){
 		WDTCTL = WDTPW + WDTSSEL_1 + WDTCNTCL + WDTIS_3;
 
 //		vCommTest();
-
-	    vSERIAL_sout("Nxt to 684: ", 12);
-	    vSERIAL_HB16out(uiRoute_GetNextHop(0x684));
         vRoute_DisplayEdges();
 
 		if(ucGLOB_diagFlagByte2.diagFlagByte2_STRUCT.DIAG_mode_main_bit)
@@ -910,6 +908,11 @@ void vMAIN_printIntro(void)
 	vSERIAL_bout(' ');
 	vMAIN_showVersionNum();
 	vSERIAL_bout(' ');
+
+    vSERIAL_crlf();
+	vSERIAL_sout("Build: ", 7);
+    vSERIAL_sout(BUILD, sizeof(BUILD));
+    vSERIAL_crlf();
 
 	vMODOPT_showCurIdentity(); //shows role and SP types attached
 
