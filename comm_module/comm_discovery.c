@@ -147,7 +147,8 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
 {
     enum
     {
-        noEdges = 0
+        noEdges = 0,
+        rtjMsgLen = 12
     };
 
 	uchar ucPacketSize;
@@ -204,11 +205,10 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
          ucPacketSize = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
 #else
          ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = noEdges;
+         ucaMSG_BUFF[MSG_IDX_LEN] = rtjMsgLen;
          ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
 #endif
 
-    // stuff message length
-    ucaMSG_BUFF[MSG_IDX_LEN] = ucPacketSize;
     ucCRC16_compute_msg_CRC(CRC_FOR_MSG_TO_SEND, ucaMSG_BUFF, ucPacketSize) ; //lint !e534 //compute the CRC
 
 	//Show the message
@@ -336,21 +336,22 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 			//Check the message integrity
 			//RET: Bit Err Mask, 0 if OK
 			ucIntegrityRetVal = ucComm_chkMsgIntegrity(integrityBits, integrityBits, MSG_ID_REQUEST_TO_JOIN, 0, uiMySN);
+
+            #if 0 
+                // Debug - Show the RTJ message
+                uint8 ucCounter;
+
+                vSERIAL_sout("RTJ Message:\r\n", 14);
+                for (ucCounter = 0; ucCounter < ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ; ucCounter++)
+                {
+                    vSERIAL_HB8out(ucaMSG_BUFF[ucCounter]);
+                    vSERIAL_crlf();
+                }
+            #endif
+
 			// If the message is good
 			if (ucIntegrityRetVal == 0)
 			{
-#if 0
-				// Debug - Show the RTJ message
-				uint8 ucCounter;
-
-				vSERIAL_sout("RTJ Message:\r\n", 14);
-				for (ucCounter = 0; ucCounter < ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ; ucCounter++)
-				{
-					vSERIAL_HB8out(ucaMSG_BUFF[ucCounter]);
-					vSERIAL_crlf();
-				}
-#endif
-
 				//Save message data
 				uiOtherGuysSN = uiMISC_buildUintFromBytes((uchar *)  &ucaMSG_BUFF[MSG_IDX_ADDR_HI],     NO_NOINT);
 				uslRandNum    = ulMISC_buildUlongFromBytes((uchar *) &ucaMSG_BUFF[MSG_IDX_RANDSEED_XI], NO_NOINT);
