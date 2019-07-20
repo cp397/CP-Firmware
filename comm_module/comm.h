@@ -600,6 +600,10 @@ union SP_LabelMessage
 //! \brief Link request index (8-bits)
 #define MSG_IDX_LRQ						11
 
+//! \def MSG_IDX_ROUTE_UPDATES
+//! \brief Index where routing table updates start
+#define MSG_IDX_ROUTE_UPDATES           12
+
 //! \def MSG_IDX_GID_HI
 //! \brief Transport layer beacon message group ID index (high byte)
 #define MSG_IDX_GID_HI					11
@@ -805,6 +809,7 @@ uchar ucComm_Handle_Command(S_Cmd S_CommandData);
 void vComm_SynchFreq(signed char cClockAdjust);
 void vComm_showSOMandROMcounts(uchar ucCRLF_termFlag);
 void vCommTest(void);
+void vCommTest_spoofNetwork(void);
 
 void vCommSetDiscMode(uint8 ucMode);
 void vCommGetDiscMode(T_Discovery *S_Disc);
@@ -851,11 +856,13 @@ uchar ucMSG_getLastFilledEntryInOM2( //RET: 0=none, ##=idx of last entry in OM2
 //! \def F_DELETE
 //! \def F_JOIN
 //! \def F_DROP
+//! \def F_ROOT
 //! \brief Flags for updates to the routing module
 #define F_NONE    0x00
 #define F_PENDING 0x01
 #define F_JOIN    0x02
 #define F_DROP    0x04
+#define F_ROOT    0x08
 
 typedef struct
 {
