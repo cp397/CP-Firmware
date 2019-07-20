@@ -205,7 +205,7 @@ void vComm_Msg_buildRequest_to_Join(ulong ulRandomSeed)
          ucPacketSize = NET_HDR_SZ + MSG_HDR_SZ + CRC_SZ + (uiNumEdges * 4);
 #else
          ucaMSG_BUFF[MSG_IDX_NUM_EDGES] = noEdges;
-         ucaMSG_BUFF[MSG_IDX_LEN] = rtjMsgLen;
+         ucaMSG_BUFF[MSG_IDX_LEN]       = rtjMsgLen;
          ucPacketSize = ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ;
 #endif
 
@@ -304,7 +304,7 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
         integrityBits = CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN,
     };
 
-    S_Edge S_Edges[10];
+    S_Edge S_Edges;
     uchar ucTotalEdges = 0; // Number of child nodes joining network
     uchar ucIntegrityRetVal;
     uchar ucMsgIndex;
@@ -381,8 +381,6 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
 				}
 #endif
 
-                ucRoute_NodeJoin(0, uiOtherGuysSN, S_Edges, (int) ucTotalEdges);
-
 				// If a RTJ is received from a node that is already in the task list then it must have
 				// dropped the link.  Therefore, we delete the task and initiate a new link with the node.
 				// This assumes that there are no duplicate node IDs in the network
@@ -412,7 +410,8 @@ static signed char cComm_WaitFor_RequesttoJoin(void)
                     vReport_LogDataElement(RPT_PRTY_LINK_BROKEN);
 				}
 
-				// Create the operational message task here
+	            // Add this node to the edge list and create the operational msg task
+                ucRoute_NodeJoin(0, uiOtherGuysSN, &S_Edges, 0);
 				ucTask_CreateOMTask(uiOtherGuysSN, uslRandNum, PARENT);
 
 #if 1
