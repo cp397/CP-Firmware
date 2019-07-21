@@ -981,7 +981,8 @@ static uchar ucComm_WaitFor_LRQ(uint* uiMsgNumber)
 		vReport_LogDataElement(ucLinkFailPriority);
 	}
 	// If the link request worked then store an RSSI report if the RSSI task is active
-	else {
+	else
+	{
 
 		// Read out the RSSI and format it into a data element
 		iRSSI = iADF7020_RequestRSSI();

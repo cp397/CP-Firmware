@@ -40,8 +40,8 @@
  *
  ******************************************************************************/
 
-#define CP_VERSION 0x4F
-#define BUILD      "032820190002"
+#define CP_VERSION 0x50
+#define BUILD      "072120191238"
 
 #define THIS_VERSION_SUBCODE	' '		//debug codes
 //#define THIS_VERSION_SUBCODE	'a'		//debug codes
@@ -368,7 +368,7 @@ void vMain_LogRestart(void);
  *
  *
  ******************************************************************************/
-void main(void){
+ void main(void){
 	//Halt the dog while the system initializes
 	WDTCTL = WDTPW + WDTHOLD;
 
@@ -716,7 +716,7 @@ void main(void){
 	/* TELL THE WORLD THAT WE ARE ALIVE */
 	vMISC_blinkLED(5);
 
-	vBUZ_tune_imperial();
+//	vBUZ_tune_imperial();
 
 	vMAIN_printIntro();
 
@@ -800,12 +800,16 @@ void main(void){
 	// clear flag
 	ucFLAG3_BYTE.FLAG3_STRUCT.FLG2_BUTTON_INT_BIT = 0;
 
+//	vCommTest();
+
 	while (1)
 	{
 		// Feed the dog
 		WDTCTL = WDTPW + WDTSSEL_1 + WDTCNTCL + WDTIS_3;
 
-//		vCommTest();
+		if( ucTask_FetchTaskIndex(TASK_ID_SOM) != INVALID_TASKINDEX )
+		    vCommTest_spoofNetwork();
+
         vRoute_DisplayEdges();
 
 		if(ucGLOB_diagFlagByte2.diagFlagByte2_STRUCT.DIAG_mode_main_bit)
