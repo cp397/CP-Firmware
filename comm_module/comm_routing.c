@@ -5,9 +5,19 @@
 #include <stdbool.h>
 #include "comm.h"
 #include "serial.h"
+#include "L2fram.h"
+
 
 
 //TODO: consider the situation where too many nodes are added to the network (may only be noticed by an ancestor node)!
+
+enum
+{
+    joinLen = 4, // Adding a node requires the parent ID and its own ID
+    dropLen = 2  // Dropping a node only requires the node ID
+};
+
+
 
 //! \var uiNumEdges
 //! \brief The number of edges in the edge list.  THis includes all descendants
@@ -67,14 +77,25 @@ static uchar ucAddEdge(uint uiSrc, uint uiDest)
 
     for (i = 0, S_ptr = S_edgeList; i < uiNumEdges; i++, S_ptr++)
     {
+        // This edge already exists
         if (S_ptr->m_uiSrc == uiSrc && S_ptr->m_uiDest == uiDest)
+        {
+            if( ucL2FRAM_isHub() )
+                S_nextEdge->m_ucflags = F_NONE;
+            else
+                S_nextEdge->m_ucflags = F_JOIN;
+
             return 0;
+        }
     }
 
     //Save the edge nodes and increment the pointer.  Also add the edges to the update list.
     S_nextEdge->m_uiSrc   = uiSrc;
     S_nextEdge->m_uiDest  = uiDest;
-    S_nextEdge->m_ucflags = F_JOIN;
+    if( ucL2FRAM_isHub() )
+        S_nextEdge->m_ucflags = F_NONE;
+    else
+        S_nextEdge->m_ucflags = F_JOIN;
 
     S_nextEdge++;                   // Increment edge list pointer
     uiNumEdges++;                   // Increment the total number of edges
@@ -270,7 +291,11 @@ uchar ucRoute_NodeUnjoin(uint uiChild)
         //Flag the unjoining node for a drop
         if (S_ptr->m_uiDest == uiChild)
         {
-            S_ptr->m_ucflags = F_DROP;
+            S_ptr->m_ucflags = F_DROP | F_ROOT;
+
+            // Set the pending flag so that the update will be cleared e
+            if( ucL2FRAM_isHub() )
+                S_ptr->m_ucflags |= F_PENDING;
 
             // Add one copy of the unjoining node to the remove stack
             if( iStackSize == 0 )
@@ -293,10 +318,14 @@ uchar ucRoute_NodeUnjoin(uint uiChild)
                 //Push the destination node of the edge to the remove stack so it will also be removed
                 removeStack[iStackSize++] = S_ptr->m_uiDest;
 
-                S_ptr->m_ucflags = F_DROP;
+                S_ptr->m_ucflags = (F_PENDING | F_DROP);
             }
         }
     }
+
+    // The root node is all that is required to inform parent nodes that the state of the network
+    // has changed.  We can remove all child nodes immediately.
+    vRoute_clearPendingUpdates(true);
 
     return (0);
 }
@@ -314,7 +343,7 @@ uchar ucRoute_GetUpdateCount(uchar ucAddOrDrop)
     S_Edge *S_ptr = S_edgeList;
 
     for (uchar ucIndex = 0; ucIndex < uiNumEdges; ucIndex++, S_ptr++)
-        if (S_ptr->m_ucflags == ucAddOrDrop)
+        if (S_ptr->m_ucflags & ucAddOrDrop)
             ucCount++;
 
     return ucCount;
@@ -322,18 +351,13 @@ uchar ucRoute_GetUpdateCount(uchar ucAddOrDrop)
 
 /////////////////////////////////////////////////////////////////////////////////
 //!
-//! \brief Returns either the number of added or dropped
+//! \brief Returns either the number of bytes for added or dropped nodes
 //!
 //! \param ucIndex
 //! \return S_edgeList[ucIndex].m_uiSrc
 ////////////////////////////////////////////////////////////////////////////////
 uchar ucRoute_GetUpdateCountBytes(uchar ucAddOrDrop)
 {
-    enum
-    {
-        joinLen = 4, // Adding a node requires the parent ID and its own ID
-        dropLen = 2  // Dropping a node only requires the node ID
-    };
     uchar ucJoinVal;
     uchar ucDropVal;
     uchar ucRetVal;
@@ -356,6 +380,19 @@ uchar ucRoute_GetUpdateCountBytes(uchar ucAddOrDrop)
     return ucRetVal;
 }
 
+
+bool contains(uint *p, uint id, uchar len)
+{
+    uchar i;
+    for( i = 0; i < len; ++i )
+    {
+        if( p[i] == id )
+            return true;
+    }
+    return false;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////////
 //!
 //! \brief Loads the update table into a buffer, typically the message buffer.
@@ -370,14 +407,16 @@ uchar ucRoute_GetUpdateCountBytes(uchar ucAddOrDrop)
 void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 {
     uchar ucJoinBytes;
-    uchar ucDropBytes;
+    uchar ucDropBytes = 0;
     S_Edge *S_ptr = S_edgeList;
+
+    uint mySn = uiL2FRAM_getSnumLo16AsUint();
 
     // Get drop update length
     ucDropBytes = ucRoute_GetUpdateCountBytes(F_DROP);
 
     // Only append drops if there are any and if there is enough room for the length and one address
-    if (ucDropBytes != 0 && ucSpaceAvail >= 2)
+    if (ucDropBytes != 0 && ucSpaceAvail >= dropLen)
     {
         // Fill drop count field
         if (ucDropBytes < ucSpaceAvail)
@@ -387,25 +426,38 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 
         S_ptr = S_edgeList;
         // Fill drop node addresses
-        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 2; ++i, S_ptr++)
+        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= dropLen; ++i, S_ptr++)
         {
-            // For drops we only load the source node.  No point in transmitting the destination
-            if (S_ptr->m_ucflags & F_DROP)
+            if( (S_ptr->m_ucflags & (F_ROOT | F_DROP)) )
             {
-                // Add the addresses to the message
-                *ucaBuff++ = (uchar) (S_ptr->m_uiSrc >> 8);
-                *ucaBuff++ = (uchar) S_ptr->m_uiSrc;
-                S_ptr->m_ucflags |= F_PENDING;
-                ucSpaceAvail -= 2;
+                if( S_ptr->m_uiSrc == mySn  )
+                {
+                    // Add the addresses to the message
+                    *ucaBuff++ = (uchar) (S_ptr->m_uiDest >> 8);
+                    *ucaBuff++ = (uchar) S_ptr->m_uiDest;
+                    ucSpaceAvail -= dropLen;
+                }
+                else
+                {
+                    // Add the addresses to the message
+                    *ucaBuff++ = (uchar) (S_ptr->m_uiSrc >> 8);
+                    *ucaBuff++ = (uchar) S_ptr->m_uiSrc;
+                    ucSpaceAvail -= dropLen;
+                }
             }
+            S_ptr->m_ucflags |= F_PENDING;
         }
+    }
+    else
+    {
+        *ucaBuff++ = 0;
     }
 
     // Get join count
     ucJoinBytes = ucRoute_GetUpdateCountBytes(F_JOIN);
 
     // If there are no joins then don't bother iterating through the list
-    if (ucJoinBytes != 0 && ucSpaceAvail >= 4)
+    if (ucJoinBytes != 0 && ucSpaceAvail >= joinLen)
     {
         // Fill join count field
         if (ucJoinBytes < ucSpaceAvail)
@@ -415,7 +467,7 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
 
         S_ptr = S_edgeList;
         // Fill join node addresses
-        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= 4; ++i, S_ptr++)
+        for (uint i = 0; i < uiNumEdges & ucSpaceAvail >= joinLen; ++i, S_ptr++)
         {
             if (S_ptr->m_ucflags & F_JOIN)
             {
@@ -425,9 +477,13 @@ void vRoute_GetUpdates(volatile uchar *ucaBuff, uchar ucSpaceAvail)
                 *ucaBuff++ = (uchar) (S_ptr->m_uiDest >> 8);
                 *ucaBuff++ = (uchar) S_ptr->m_uiDest;
                 S_ptr->m_ucflags |= F_PENDING;
-                ucSpaceAvail -= 4;
+                ucSpaceAvail -= joinLen;
             }
         }
+    }
+    else
+    {
+        *ucaBuff++ = 0;
     }
 
 }//END: vRoute_GetUpdates();
@@ -457,14 +513,11 @@ void vRoute_clearPendingUpdates(bool success)
             S_ptr->m_ucflags &= ~F_PENDING;
 
             // If the push wasn't successful then don't clear F_DROP or F_JOIN
-            if (!success)
-                continue;
-
-            if (S_ptr->m_ucflags & F_DROP)
+            if (success && (S_ptr->m_ucflags & F_DROP))
             {
                 ucRoute_RemoveEdge(S_ptr->m_uiSrc, S_ptr->m_uiDest);
             }
-            else if (S_ptr->m_ucflags & F_JOIN)
+            else if (success && (S_ptr->m_ucflags & F_JOIN))
             {
                 S_ptr->m_ucflags = F_NONE;
                 S_ptr++;
@@ -541,6 +594,8 @@ void vRoute_DisplayEdges(void)
         vSERIAL_sout("          ", 10);
         if( S_edgeList[uiEdgeCount].m_ucflags == F_NONE)
             vSERIAL_sout("active ", 7);
+        if( S_edgeList[uiEdgeCount].m_ucflags & F_ROOT)
+            vSERIAL_sout("root   ", 7);
         if( S_edgeList[uiEdgeCount].m_ucflags & F_JOIN)
             vSERIAL_sout("joined ", 7);
         if( S_edgeList[uiEdgeCount].m_ucflags & F_DROP)

@@ -749,10 +749,17 @@ void vComm_SendRTR(void)
 /////////////////////////////////////////////////////////////////////////////
 void vComm_SendLRQ(uchar ucLinkByte)
 {
+    enum
+    {
+        msgNum        = 1,
+        minPayloadlen = 3, // This includes the linkByte, number of added nodes, and number of dropped nodes.
+        minMsgLen     = MSG_HDR_SZ + minPayloadlen
+    };
 	ulong ulOtherGuysSN;
 	uint uiOtherGuysSN;
 	uchar ucUpdateCount;
 	uchar ucSpaceLeft;
+    uchar flags;
 
 	// GET THE OTHER LINK'S SERIAL NUM
 	ucTask_GetField(g_ucaCurrentTskIndex, PARAM_SN, &ulOtherGuysSN);
@@ -761,18 +768,19 @@ void vComm_SendLRQ(uchar ucLinkByte)
 	// Network Layer
 	vComm_NetPkg_buildHdr(uiOtherGuysSN);
 
-	// Single message
-	vComm_Msg_buildOperational(MSG_FLG_SINGLE, 1, uiOtherGuysSN, MSG_ID_LRQ);
-
-	// Add the message length as well as the link request and network update fields
-	ucaMSG_BUFF[MSG_IDX_LEN] = MSG_HDR_SZ + 3;
-	ucaMSG_BUFF[MSG_IDX_LRQ] = ucLinkByte;
-
 	// Get the total number of routing updates
 	ucUpdateCount = ucRoute_GetUpdateCountBytes(F_JOIN | F_DROP);
 
 	// If there are no updates then just send the link byte and exit
-	if (ucUpdateCount == 0) {
+	if (ucUpdateCount == 0)
+	{
+	    // Single message
+	    vComm_Msg_buildOperational(MSG_FLG_SINGLE, msgNum, uiOtherGuysSN, MSG_ID_LRQ);
+
+	    // Add the message length as well as the link request and network update fields
+	    ucaMSG_BUFF[MSG_IDX_LEN] = minMsgLen;
+	    ucaMSG_BUFF[MSG_IDX_LRQ] = ucLinkByte;
+
 		// Set the join and drop lengths to 0
 		ucaMSG_BUFF[(uchar) (MSG_IDX_LRQ + 1)] = 0;
 		ucaMSG_BUFF[(uchar) (MSG_IDX_LRQ + 2)] = 0;
@@ -787,7 +795,6 @@ void vComm_SendLRQ(uchar ucLinkByte)
 
 		// Send the Message
 		vADF7020_SendMsg();
-
 		return;
 	}
 
@@ -795,25 +802,27 @@ void vComm_SendLRQ(uchar ucLinkByte)
 	ucSpaceLeft = MAX_MSG_SIZE - (ucaMSG_BUFF[MSG_IDX_LEN] + NET_HDR_SZ + CRC_SZ);
 
 	// If there is enough room in the current message to send all required updates
-	while (ucUpdateCount != 0) {
+	while (ucUpdateCount != 0)
+	{
 		// Set the link request byte
 		ucaMSG_BUFF[MSG_IDX_LRQ] = ucLinkByte;
 
-		// Add the update count to the current message length
-		ucaMSG_BUFF[MSG_IDX_LEN] = ucUpdateCount + MSG_HDR_SZ + 4;
-
 		// Load the updates into the message buffer after the link request byte
-		vRoute_GetUpdates(&ucaMSG_BUFF[(uchar) (MSG_IDX_LRQ + 1)], ucSpaceLeft);
+		vRoute_GetUpdates(&ucaMSG_BUFF[MSG_IDX_ROUTE_UPDATES], ucSpaceLeft);
 
 		// Build the header
-		if (ucUpdateCount > ucSpaceLeft) {
-			vComm_NetPkg_buildHdr(uiOtherGuysSN);
-			vComm_Msg_buildOperational(MSG_FLG_ACKRQST, 1, uiOtherGuysSN, MSG_ID_LRQ);
-			ucaMSG_BUFF[MSG_IDX_LEN] = ucSpaceLeft + MSG_HDR_SZ + 4;
+        vComm_NetPkg_buildHdr(uiOtherGuysSN);
+		if (ucUpdateCount > ucSpaceLeft)
+		{
+		    flags = MSG_FLG_ACKRQST;
+			vComm_Msg_buildOperational(flags, msgNum, uiOtherGuysSN, MSG_ID_LRQ);
+			ucaMSG_BUFF[MSG_IDX_LEN] = minMsgLen + ucSpaceLeft;
 		}
-		else {
-			vComm_NetPkg_buildHdr(uiOtherGuysSN);
-			vComm_Msg_buildOperational(MSG_FLG_SINGLE, 1, uiOtherGuysSN, MSG_ID_LRQ);
+		else
+		{
+            flags = MSG_FLG_SINGLE;
+			vComm_Msg_buildOperational(flags, msgNum, uiOtherGuysSN, MSG_ID_LRQ);
+	        ucaMSG_BUFF[MSG_IDX_LEN] = minMsgLen + ucUpdateCount;
 		}
 
 		// COMPUTE THE CRC
@@ -826,26 +835,27 @@ void vComm_SendLRQ(uchar ucLinkByte)
 		// Send the Message
 		vADF7020_SendMsg();
 
-		// If we have sent all updates then exit the loop
-		if (ucUpdateCount < ucSpaceLeft)
-			break;
-
-		// Wait for an ack
-		vADF7020_TXRXSwitch(RADIO_RX_MODE);
-		if (!ucComm_WaitForAck(1))
+		if( flags == MSG_FLG_ACKRQST )
 		{
-		    vRoute_clearPendingUpdates(FALSE);
-			return;
+            // Wait for an ack
+            vADF7020_TXRXSwitch(RADIO_RX_MODE);
+            if (!ucComm_WaitForAck(msgNum))
+            {
+                vRoute_clearPendingUpdates(FALSE);
+                return;
+            }
 		}
 
 		// Since we have received an ACK we can remove the flagged updates
 		vRoute_clearPendingUpdates(TRUE);
 
+        // If we have sent all updates then exit the loop
+        if (ucUpdateCount < ucSpaceLeft)
+            break;
+
 		// Get the total number of routing updates
 		ucUpdateCount = ucRoute_GetUpdateCountBytes(F_JOIN | F_DROP);
-
 	}
-
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -859,7 +869,7 @@ void vComm_SendLRQ(uchar ucLinkByte)
 //! \param none
 //! \return 1 for success, 0 for failure
 /////////////////////////////////////////////////////////////////////////////
-static uchar ucComm_WaitFor_LRQ(void)
+static uchar ucComm_WaitFor_LRQ(uint* uiMsgNumber)
 {
 	uchar ucLinkFailReason;
 	uchar ucLinkFailPriority;
@@ -888,11 +898,9 @@ static uchar ucComm_WaitFor_LRQ(void)
 	// Get my serial number
 	uiMySN = uiL2FRAM_getSnumLo16AsUint();
 
-//	//	Might be receiving a message from another node, keep listening instead of giving up after one message
-//	while (ucTimeCheckForAlarms(SUBSLOT_WARNING_ALARM_BIT) == 0) {
-
 	// Wait for a reply from the child node
-	if (ucComm_waitForMsgOrTimeout(YES_RSSI)) {
+	if (ucComm_waitForMsgOrTimeout(YES_RSSI))
+	{
 		/* GOT A MSG -- CHK FOR: CRC, MSGTYPE, GROUPID, DEST_SN */
 		if (!(ucComm_chkMsgIntegrity( //RET: Bit Err Mask, 0 if OK
 				CHKBIT_CRC + CHKBIT_MSG_TYPE + CHKBIT_DEST_SN + CHKBIT_SRC_SN, //chk flags
@@ -900,12 +908,14 @@ static uchar ucComm_WaitFor_LRQ(void)
 				MSG_ID_LRQ, //msg type
 				uiOtherGuysSN, //src SN
 				uiMySN //Dst SN
-				))) {
+				)))
+		{
 
 			// Zero the missed messages
 			vComm_zroMissedMsgCnt();
 
 			ucLinkRequest = ucaMSG_BUFF[MSG_IDX_LRQ];
+            *uiMsgNumber  = (uint)(ucaMSG_BUFF[MSG_IDX_NUM_HI] << 8) | ucaMSG_BUFF[MSG_IDX_NUM_LO];
 
 			vSERIAL_sout("LnkByte: ", 9);
 			vLNKBLK_showLnkReq(ucLinkRequest);
@@ -931,34 +941,30 @@ static uchar ucComm_WaitFor_LRQ(void)
 			else
 				ucRetVal = 1; // Indicates all link data has been received from the child
 
-//				break;
 		} // END: if(Integrity)
 	} // END: if(Timeout or message received)
 
-//		// Reset the radio in the event that the message failed the integrity check
-//		vADF7020_TXRXSwitch(RADIO_RX_MODE);
-//	}
-
 	// No message received
-	if (ucRetVal == 0) {
+	if (ucRetVal == 0)
+	{
 		// Stash the link request if allowed
 		ucLNKBLK_ReadFlags(uiOtherGuysSN, &ucLnkFlags);
-		if (ucLnkFlags & F_OVERWRITE) {
+		if (ucLnkFlags & F_OVERWRITE)
+		{
 			// SETUP A DEFAULT LINK BYTE
-			ucLNKBLK_fillLnkBlkFromMultipleLnkReq(uiOtherGuysSN, //Tbl Idx
-					LNKREQ_1FRAME_1LNK, //Lnk Confirm
-					lTIME_getSysTimeAsLong());
+			ucLNKBLK_fillLnkBlkFromMultipleLnkReq(uiOtherGuysSN, LNKREQ_1FRAME_1LNK, lTIME_getSysTimeAsLong());
 			// Set the over write flag.  If we manage to communicate again this frame we want to be able
 			// to set up a new link block
 			ucLNKBLK_SetFlag(uiOtherGuysSN, F_OVERWRITE);
 		}
 
-		ucLinkFailReason = SRC_ID_MISSED_LRQ; //assume its a simple miss
+		ucLinkFailReason   = SRC_ID_MISSED_LRQ; //assume its a simple miss
 		ucLinkFailPriority = RPT_PRTY_MISSED_LRQ;
 
 		// Check for a broken link
-		if (ucComm_incLnkBrkCntAndChkForDeadOM2()) {
-			ucLinkFailReason = SRC_ID_LINK_BROKEN; //wups this is the big fail
+		if (ucComm_incLnkBrkCntAndChkForDeadOM2())
+		{
+			ucLinkFailReason   = SRC_ID_LINK_BROKEN; //wups this is the big fail
 			ucLinkFailPriority = RPT_PRTY_LINK_BROKEN;
 		}
 
@@ -1193,28 +1199,27 @@ uchar ucComm_WaitFor_RTR(void)
 /////////////////////////////////////////////////////////////////////////////
 uchar ucComm_WaitForAck(uint uiMsgNumber)
 {
-	uchar ucRetVal;
+    enum
+    {
+        integrityFlags = CHKBIT_CRC + CHKBIT_MSG_TYPE,
+        ckFlags        = integrityFlags,
+        rprtFlags      = integrityFlags
+    };
 
-	// Assume failure
-	ucRetVal = 0;
+    // Assume failure
+	uchar ucRetVal = 0;
 
 	// Wait for a reply from the child node
-	if (ucComm_waitForMsgOrTimeout(NO_RSSI)) {
-		/* GOT A MSG -- CHK FOR: CRC, MSGTYPE, GROUPID, DEST_SN */
-		if (!(ucComm_chkMsgIntegrity( //RET: Bit Err Mask, 0 if OK
-				CHKBIT_CRC + CHKBIT_MSG_TYPE, //chk flags
-				CHKBIT_CRC + CHKBIT_MSG_TYPE, //report flags
-				MSG_ID_OPERATIONAL, //msg type
-				0, //src SN
-				0 //Dst SN
-				))) {
+	if( ucComm_waitForMsgOrTimeout(NO_RSSI) )
+	{
+		if( !(ucComm_chkMsgIntegrity(ckFlags, rprtFlags, MSG_ID_OPERATIONAL, 0, 0)) )
+		{
 			// Check the ack flag and the message number
-			if ((uiMsgNumber == ((ucaMSG_BUFF[MSG_IDX_NUM_HI] << 8) | ucaMSG_BUFF[MSG_IDX_NUM_LO])) && (ucaMSG_BUFF[MSG_IDX_FLG] & MSG_FLG_ACK)) {
-				// Set the return byte indicating success
+			if ((uiMsgNumber == ((ucaMSG_BUFF[MSG_IDX_NUM_HI] << 8) | ucaMSG_BUFF[MSG_IDX_NUM_LO])) && (ucaMSG_BUFF[MSG_IDX_FLG] & MSG_FLG_ACK))
 				ucRetVal = 1;
-			}
 		}
 	}
+
 	return ucRetVal; // Return the status
 }
 
@@ -1325,23 +1330,22 @@ void vComm_Parent(void)
 	vADF7020_StartReceiver();
 
 	// Wait for the link request packet
-	ucLRQRetVal = ucComm_WaitFor_LRQ();
+	ucLRQRetVal = ucComm_WaitFor_LRQ(&uiMsgNumber);
 
 	// If the LRQ return value equals 1 then it is either the only LRQ packet or the last one in the sequence
-	while (ucLRQRetVal != 1) {
+	while (ucLRQRetVal != 1)
+	{
 		if (ucLRQRetVal == 0) // The LRQ timed out
-				{
+		{
 			vADF7020_Quit();
 			return;
 		}
 		else if (ucLRQRetVal == 2) // The LRQ is part of a sequence and the child is waiting for an ACK
-				{
-			uiMsgNumber = ((ucaMSG_BUFF[MSG_IDX_NUM_HI] << 8) | ucaMSG_BUFF[MSG_IDX_NUM_LO]);
+		{
 			vComm_SendAck(uiMsgNumber);
-
 			// set the radio state to RX mode
 			vADF7020_TXRXSwitch(RADIO_RX_MODE);
-			ucLRQRetVal = ucComm_WaitFor_LRQ();
+			ucLRQRetVal = ucComm_WaitFor_LRQ(&uiMsgNumber);
 		}
 	}
 
@@ -1602,78 +1606,267 @@ void vComm_showSOMandROMcounts(uchar ucCRLF_termFlag)
 
 }/* END: vSTBL_showSOM2andROM2counts() */
 
+
+void verifyPaths(void)
+{
+    // This test function creates a network and verifies that the next hop to each node
+    // is correctly found.
+    enum
+    {
+        firstNode   = 1,
+        childOffset = 100,
+        numEdges    = 20
+    };
+    S_Edge S_edges[100];
+    S_Edge* p = S_edges;
+    uint j;
+    uint t;
+    uint i;
+
+    // Build the test network
+    for( i = firstNode, j = childOffset; i < firstNode + numEdges; ++i, ++j )
+    {
+        if( i == firstNode )
+            p->m_uiSrc  = i;
+        else
+            p->m_uiSrc  = t;
+        p->m_uiDest = j;
+        t = j;
+        ++p;
+    }
+    ucRoute_NodeJoin(0, firstNode, S_edges, numEdges);
+    vRoute_DisplayEdges();
+
+    p = S_edges;
+    for( i = firstNode; i < firstNode + numEdges; ++i )
+    {
+        if( i == firstNode )
+        {
+            vSERIAL_HB16out(uiL2FRAM_getSnumLo16AsUint());
+            vSERIAL_sout(" - ", 3);
+            vSERIAL_HB16out(firstNode);
+            vSERIAL_crlf();
+            if( uiRoute_GetNextHop(firstNode) != firstNode )
+                vSERIAL_sout("F\r\n", 3);
+        }
+        vSERIAL_HB16out(uiRoute_GetNextHop(p->m_uiDest));
+        vSERIAL_sout(" - ", 3);
+        vSERIAL_HB16out(p->m_uiDest);
+        vSERIAL_crlf();
+        if( uiRoute_GetNextHop(p->m_uiDest) != firstNode )
+            vSERIAL_sout("F\r\n", 3);
+        ++p;
+    }
+
+    // Remove the modifications to the edglist made by this test routine
+    ucRoute_NodeUnjoin(firstNode);
+    vRoute_GetUpdates(ucaMSG_BUFF, 70);
+    vRoute_GetUpdates(ucaMSG_BUFF, 70);
+    vRoute_clearPendingUpdates(TRUE);
+    vRoute_DisplayEdges();
+}
+
+
+void vCommTest_spoofNetwork(void)
+{
+    enum
+    {
+        state_doNothing,
+        state_init,
+        state_dropAll,
+        state_reload,
+        state_drop1,
+
+        count_dropAll = 120,
+        count_reload  = 240,
+        count_drop1   = 600,
+    };
+    static uint8  state   = state_init;
+    static uint32 counter = 0; // Transitions driven by calls to the function
+    S_Edge S_edges[100];
+
+    // Build a test network
+    S_edges[0].m_uiSrc = (0x770);
+    S_edges[0].m_uiDest = (0x771);
+
+    S_edges[1].m_uiSrc = (0x770);
+    S_edges[1].m_uiDest = (0x778);
+
+    S_edges[2].m_uiSrc = 0x771;
+    S_edges[2].m_uiDest = 0x772;
+
+    S_edges[3].m_uiSrc = 0x772;
+    S_edges[3].m_uiDest = 0x773;
+
+    S_edges[4].m_uiSrc = 0x772;
+    S_edges[4].m_uiDest = 0x774;
+
+    S_edges[5].m_uiSrc = 0x778;
+    S_edges[5].m_uiDest = 0x775;
+
+    S_edges[6].m_uiSrc = 0x778;
+    S_edges[6].m_uiDest = 0x776;
+
+    S_edges[7].m_uiSrc = 0x776;
+    S_edges[7].m_uiDest = 0x777;
+
+    S_edges[8].m_uiSrc = 0x776;
+    S_edges[8].m_uiDest = 0x780;
+
+    S_edges[9].m_uiSrc = 0x776;
+    S_edges[9].m_uiDest = 0x781;
+
+    S_edges[10].m_uiSrc = 0x776;
+    S_edges[10].m_uiDest = 0x782;
+
+    S_edges[11].m_uiSrc = 0x776;
+    S_edges[11].m_uiDest = 0x783;
+
+    S_edges[12].m_uiSrc = 0x776;
+    S_edges[12].m_uiDest = 0x784;
+
+    S_edges[13].m_uiSrc = 0x776;
+    S_edges[13].m_uiDest = 0x785;
+
+    S_edges[14].m_uiSrc = 0x776;
+    S_edges[14].m_uiDest = 0x786;
+
+    S_edges[15].m_uiSrc = 0x776;
+    S_edges[15].m_uiDest = 0x787;
+
+    S_edges[16].m_uiSrc = 0x776;
+    S_edges[16].m_uiDest = 0x788;
+
+    S_edges[17].m_uiSrc = 0x776;
+    S_edges[17].m_uiDest = 0x789;
+
+    S_edges[18].m_uiSrc = 0x776;
+    S_edges[18].m_uiDest = 0x78A;
+
+    S_edges[19].m_uiSrc = 0x776;
+    S_edges[19].m_uiDest = 0x78B;
+
+    ++counter;
+
+    switch( state )
+    {
+    case state_doNothing:
+
+        switch(counter)
+        {
+        case count_dropAll:
+            state = state_dropAll;
+            break;
+        case count_reload:
+            state = state_reload;
+            break;
+        case count_drop1:
+            state = state_drop1;
+            break;
+        default:
+            break;
+        }
+
+        break;
+    case state_init:
+        vSERIAL_sout("Loading list...\r\n", 17);
+        ucRoute_NodeJoin(0, 0x770, S_edges, 2);
+        state = state_doNothing;
+        break;
+
+    case state_dropAll:
+        vSERIAL_sout("Drop 770...\r\n", 13);
+        ucRoute_NodeUnjoin(0x770);
+        state = state_doNothing;
+        break;
+
+    case state_reload:
+        vSERIAL_sout("Reload list...\r\n", 17);
+        ucRoute_NodeJoin(0, 0x770, S_edges, 2);
+        state = state_doNothing;
+        break;
+
+    case state_drop1:
+        vSERIAL_sout("Drop 778...\r\n", 13);
+        ucRoute_NodeUnjoin(0x778);
+        state = state_init;
+        counter = 0; // Reset and repeat
+        break;
+    }
+
+}
+
+
 void vCommTest(void)
 {
-	S_Edge S_edgeListTemp[20];
+	S_Edge S_edges[100];
+
+//	verifyPaths();
 
 	// Build a test network
-	S_edgeListTemp[0].m_uiSrc = (0x770);
-	S_edgeListTemp[0].m_uiDest = (0x771);
+	S_edges[0].m_uiSrc = (0x770);
+	S_edges[0].m_uiDest = (0x771);
 
-	S_edgeListTemp[1].m_uiSrc = (0x770);
-	S_edgeListTemp[1].m_uiDest = (0x778);
+	S_edges[1].m_uiSrc = (0x770);
+	S_edges[1].m_uiDest = (0x778);
 
-	S_edgeListTemp[2].m_uiSrc = 0x771;
-	S_edgeListTemp[2].m_uiDest = 0x772;
+	S_edges[2].m_uiSrc = 0x771;
+	S_edges[2].m_uiDest = 0x772;
 
-	S_edgeListTemp[3].m_uiSrc = 0x772;
-	S_edgeListTemp[3].m_uiDest = 0x773;
+	S_edges[3].m_uiSrc = 0x772;
+	S_edges[3].m_uiDest = 0x773;
 
-	S_edgeListTemp[4].m_uiSrc = 0x772;
-	S_edgeListTemp[4].m_uiDest = 0x774;
+	S_edges[4].m_uiSrc = 0x772;
+	S_edges[4].m_uiDest = 0x774;
 
-	S_edgeListTemp[5].m_uiSrc = 0x778;
-	S_edgeListTemp[5].m_uiDest = 0x775;
+	S_edges[5].m_uiSrc = 0x778;
+	S_edges[5].m_uiDest = 0x775;
 
-	S_edgeListTemp[6].m_uiSrc = 0x778;
-	S_edgeListTemp[6].m_uiDest = 0x776;
+	S_edges[6].m_uiSrc = 0x778;
+	S_edges[6].m_uiDest = 0x776;
 
-	S_edgeListTemp[7].m_uiSrc = 0x776;
-	S_edgeListTemp[7].m_uiDest = 0x777;
+	S_edges[7].m_uiSrc = 0x776;
+	S_edges[7].m_uiDest = 0x777;
 
-//	S_edgeListTemp[8].m_uiSrc = 0x776;
-//	S_edgeListTemp[8].m_uiDest = 0x780;
-//
-//	S_edgeListTemp[9].m_uiSrc = 0x776;
-//	S_edgeListTemp[9].m_uiDest = 0x781;
-//
-//	S_edgeListTemp[10].m_uiSrc = 0x776;
-//	S_edgeListTemp[10].m_uiDest = 0x782;
-//
-//	S_edgeListTemp[11].m_uiSrc = 0x776;
-//	S_edgeListTemp[11].m_uiDest = 0x783;
-//
-//	S_edgeListTemp[12].m_uiSrc = 0x776;
-//	S_edgeListTemp[12].m_uiDest = 0x784;
-//
-//	S_edgeListTemp[13].m_uiSrc = 0x776;
-//	S_edgeListTemp[13].m_uiDest = 0x785;
-//
-//	S_edgeListTemp[14].m_uiSrc = 0x776;
-//	S_edgeListTemp[14].m_uiDest = 0x786;
-//
-//	S_edgeListTemp[15].m_uiSrc = 0x776;
-//	S_edgeListTemp[15].m_uiDest = 0x787;
-//
-//	S_edgeListTemp[16].m_uiSrc = 0x776;
-//	S_edgeListTemp[16].m_uiDest = 0x788;
-//
-//	S_edgeListTemp[17].m_uiSrc = 0x776;
-//	S_edgeListTemp[17].m_uiDest = 0x789;
-//
-//	S_edgeListTemp[18].m_uiSrc = 0x776;
-//	S_edgeListTemp[18].m_uiDest = 0x78A;
-//
-//	S_edgeListTemp[19].m_uiSrc = 0x776;
-//	S_edgeListTemp[19].m_uiDest = 0x78B;
+	S_edges[8].m_uiSrc = 0x776;
+	S_edges[8].m_uiDest = 0x780;
+
+	S_edges[9].m_uiSrc = 0x776;
+	S_edges[9].m_uiDest = 0x781;
+
+	S_edges[10].m_uiSrc = 0x776;
+	S_edges[10].m_uiDest = 0x782;
+
+	S_edges[11].m_uiSrc = 0x776;
+	S_edges[11].m_uiDest = 0x783;
+
+	S_edges[12].m_uiSrc = 0x776;
+	S_edges[12].m_uiDest = 0x784;
+
+	S_edges[13].m_uiSrc = 0x776;
+	S_edges[13].m_uiDest = 0x785;
+
+	S_edges[14].m_uiSrc = 0x776;
+	S_edges[14].m_uiDest = 0x786;
+
+	S_edges[15].m_uiSrc = 0x776;
+	S_edges[15].m_uiDest = 0x787;
+
+	S_edges[16].m_uiSrc = 0x776;
+	S_edges[16].m_uiDest = 0x788;
+
+	S_edges[17].m_uiSrc = 0x776;
+	S_edges[17].m_uiDest = 0x789;
+
+	S_edges[18].m_uiSrc = 0x776;
+	S_edges[18].m_uiDest = 0x78A;
+
+	S_edges[19].m_uiSrc = 0x776;
+	S_edges[19].m_uiDest = 0x78B;
 
 
-	vSERIAL_sout("Loading list...\r\n", 16);
-	ucRoute_NodeJoin(0, 0x770, S_edgeListTemp, 8);
-
-	vSERIAL_sout("Nxt to 770: ", 12);
-	vSERIAL_HB16out(uiRoute_GetNextHop(0x770));
-	vSERIAL_crlf();
+	vSERIAL_sout("Loading list...\r\n", 17);
+	ucRoute_NodeJoin(0, 0x770, S_edges, 20);
 
 	vRoute_DisplayEdges();
 
@@ -1686,24 +1879,35 @@ void vCommTest(void)
     vRoute_DisplayEdges();
 
 	ucRoute_NodeUnjoin(0x770);
+    vRoute_DisplayEdges();
 
 	vSERIAL_sout("Nxt to 770: ", 12);
 	vSERIAL_HB16out(uiRoute_GetNextHop(0x770));
 	vSERIAL_crlf();
 
-
     vSERIAL_sout("Get updates...\r\n", 16);
     vRoute_GetUpdates(ucaMSG_BUFF, 70);
     vRoute_DisplayEdges();
 
-    vSERIAL_sout("Clr updates...\r\n", 16);
-    vRoute_clearPendingUpdates(TRUE);
+    vSERIAL_sout("Clr updates failure...\r\n", 16);
+    vRoute_clearPendingUpdates(false);
     vRoute_DisplayEdges();
 
+    vSERIAL_sout("Get updates again...\r\n", 22);
+    vRoute_GetUpdates(ucaMSG_BUFF, 70);
+    vRoute_DisplayEdges();
 
-//	vComm_SendLRQ(0x12);
-//
-//	ucComm_WaitFor_LRQ();
+    vSERIAL_sout("Clr updates success...\r\n", 24);
+    vRoute_clearPendingUpdates(true);
+    vRoute_DisplayEdges();
+
+    vSERIAL_sout("Loading list...\r\n", 17);
+    ucRoute_NodeJoin(0, 0x770, S_edges, 20);
+    ucRoute_NodeUnjoin(0x776);
+    vRoute_DisplayEdges();
+    vRoute_GetUpdates(ucaMSG_BUFF, 70);
+    vRoute_clearPendingUpdates(true);
+    vRoute_DisplayEdges();
 }
 
 //! @} 
