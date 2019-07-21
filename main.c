@@ -807,8 +807,8 @@ void vMain_LogRestart(void);
 		// Feed the dog
 		WDTCTL = WDTPW + WDTSSEL_1 + WDTCNTCL + WDTIS_3;
 
-		if( ucTask_FetchTaskIndex(TASK_ID_SOM) != INVALID_TASKINDEX )
-		    vCommTest_spoofNetwork();
+//		if( ucTask_FetchTaskIndex(TASK_ID_SOM) != INVALID_TASKINDEX )
+//		    vCommTest_spoofNetwork();
 
         vRoute_DisplayEdges();
 
