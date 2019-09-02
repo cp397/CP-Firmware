@@ -716,7 +716,7 @@ void vMain_LogRestart(void);
 	/* TELL THE WORLD THAT WE ARE ALIVE */
 	vMISC_blinkLED(5);
 
-//	vBUZ_tune_imperial();
+	vBUZ_tune_imperial();
 
 	vMAIN_printIntro();
 
